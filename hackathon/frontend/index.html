@@ -1,9 +1,10 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Reserve Juggler — Institutional Treasury Engine</title>
+
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
@@ -34,7 +35,8 @@
 
   <style>
     body {
-      background-color: #0B0F14;
+      margin: 0;
+      background: #0B0F14;
       color: #E6EDF3;
       font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
     }
@@ -42,6 +44,11 @@
     .mono-num {
       font-variant-numeric: tabular-nums;
       font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+
+    button:disabled {
+      opacity: .5;
+      cursor: not-allowed;
     }
   </style>
 </head>
@@ -54,16 +61,37 @@
     const API_BASE = window.location.origin;
 
     function formatUSD(cents) {
-      if (cents === undefined || cents === null) return "$0.00";
+      if (cents === undefined || cents === null || !Number.isFinite(Number(cents))) {
+        return "$0.00";
+      }
 
-      return new Intl.NumberFormat('en-US', {
-        style: 'currency',
-        currency: 'USD'
+      return new Intl.NumberFormat("en-US", {
+        style: "currency",
+        currency: "USD",
+        maximumFractionDigits: 2
       }).format(Number(cents) / 100);
     }
 
+    function formatMillions(value) {
+      const n = Number(value) || 0;
+
+      if (Math.abs(n) >= 1e9) {
+        return "$" + (n / 1e9).toFixed(2) + "B";
+      }
+
+      if (Math.abs(n) >= 1e6) {
+        return "$" + (n / 1e6).toFixed(1) + "M";
+      }
+
+      if (Math.abs(n) >= 1e3) {
+        return "$" + (n / 1e3).toFixed(0) + "K";
+      }
+
+      return "$" + n.toFixed(0);
+    }
+
     function App() {
-      const [tab, setTab] = useState('dashboard');
+      const [tab, setTab] = useState("dashboard");
       const [kpis, setKpis] = useState(null);
       const [reserves, setReserves] = useState(null);
       const [decisions, setDecisions] = useState([]);
@@ -73,60 +101,73 @@
       const [backtestResults, setBacktestResults] = useState(null);
       const [backtestLoading, setBacktestLoading] = useState(false);
       const [stressReport, setStressReport] = useState(null);
-      const [selectedScenario, setSelectedScenario] = useState('OUTFLOW_MULT');
-      const [sweepAmount, setSweepAmount] = useState('10000000');
+      const [selectedScenario, setSelectedScenario] = useState("OUTFLOW_MULT");
+      const [sweepAmount, setSweepAmount] = useState("10000000");
       const [sweepPreview, setSweepPreview] = useState(null);
       const [chartHistory, setChartHistory] = useState([]);
+      const [apiError, setApiError] = useState("");
 
       const chartRef = useRef(null);
       const chartInstance = useRef(null);
+      const historyRef = useRef([]);
 
       async function fetchState(resetHistory = false) {
         try {
-          const [kpiRes, resRes, decRes, fcRes] = await Promise.all([
-            fetch(`${API_BASE}/api/v1/kpis?run_id=run_live_01`),
-            fetch(`${API_BASE}/api/v1/reserve?run_id=run_live_01`),
-            fetch(`${API_BASE}/api/v1/treasury/decisions?run_id=run_live_01&limit=20`),
-            fetch(`${API_BASE}/api/v1/forecast?run_id=run_live_01&horizon=24`)
-          ]);
+          const [kpiRes, reserveRes, decisionsRes, forecastRes] =
+            await Promise.all([
+              fetch(`${API_BASE}/api/v1/kpis?run_id=run_live_01`),
+              fetch(`${API_BASE}/api/v1/reserve?run_id=run_live_01`),
+              fetch(`${API_BASE}/api/v1/treasury/decisions?run_id=run_live_01&limit=20`),
+              fetch(`${API_BASE}/api/v1/forecast?run_id=run_live_01&horizon=24`)
+            ]);
 
-          let nextKpis = null;
-          let nextReserves = null;
-
-          if (kpiRes.ok) {
-            nextKpis = await kpiRes.json();
-            setKpis(nextKpis);
+          if (!kpiRes.ok) {
+            throw new Error(`KPI API returned ${kpiRes.status}`);
           }
 
-          if (resRes.ok) {
-            nextReserves = await resRes.json();
+          const nextKpis = await kpiRes.json();
+          setKpis(nextKpis);
+
+          let nextReserves = null;
+
+          if (reserveRes.ok) {
+            nextReserves = await reserveRes.json();
             setReserves(nextReserves);
           }
 
-          if (decRes.ok) {
-            setDecisions(await decRes.json());
+          if (decisionsRes.ok) {
+            const data = await decisionsRes.json();
+            setDecisions(Array.isArray(data) ? data : data.decisions || []);
           }
 
-          if (fcRes.ok) {
-            setForecastData(await fcRes.json());
+          if (forecastRes.ok) {
+            setForecastData(await forecastRes.json());
           }
 
-          if (nextKpis && nextReserves) {
+          if (nextKpis) {
             const snapshot = {
-              step: Number(nextKpis.step ?? 0),
+              step: Number(nextKpis.step ?? nextKpis.step_index ?? 0),
               cash: Number(nextKpis.cash_cents ?? 0) / 100,
               repo: Number(nextKpis.repo_cents ?? 0) / 100,
               reserve: Number(
-                nextReserves.r_total_cents ??
-                nextKpis.r_total_cents ?? 0
+                nextReserves?.r_total_cents ??
+                nextKpis.r_total_cents ??
+                0
               ) / 100,
-              hardFloor: Number(nextReserves.f_hard_cents ?? 0) / 100
+              hardFloor: Number(
+                nextReserves?.f_hard_cents ??
+                nextKpis.f_hard_cents ??
+                0
+              ) / 100
             };
 
-            setChartHistory(previous => {
-              if (resetHistory) return [snapshot];
+            const previous = historyRef.current;
+            let updated;
 
-              const updated = [...previous];
+            if (resetHistory) {
+              updated = [snapshot];
+            } else {
+              updated = [...previous];
               const last = updated[updated.length - 1];
 
               if (last && last.step === snapshot.step) {
@@ -134,27 +175,39 @@
               } else {
                 updated.push(snapshot);
               }
+            }
 
-              return updated.slice(-24);
-            });
+            updated = updated.slice(-24);
+            historyRef.current = updated;
+            setChartHistory(updated);
           }
+
+          setApiError("");
         } catch (error) {
-          console.error('Error fetching state:', error);
+          console.error("Failed to load application data:", error);
+          setApiError(error.message || "Unable to load application data.");
         }
       }
 
       useEffect(() => {
         fetchState();
+
+        return () => {
+          if (chartInstance.current) {
+            chartInstance.current.dispose();
+            chartInstance.current = null;
+          }
+        };
       }, []);
 
       useEffect(() => {
-        if (!isRunning) return;
+        if (!isRunning) return undefined;
 
-        const interval = setInterval(() => {
+        const timer = setInterval(() => {
           handleStep();
-        }, 1500);
+        }, 2000);
 
-        return () => clearInterval(interval);
+        return () => clearInterval(timer);
       }, [isRunning]);
 
       async function handleStep() {
@@ -162,20 +215,21 @@
           const response = await fetch(
             `${API_BASE}/api/v1/sim/runs/run_live_01/step`,
             {
-              method: 'POST',
+              method: "POST",
               headers: {
-                'Idempotency-Key': 'step_' + Date.now()
+                "Idempotency-Key": "step_" + Date.now()
               }
             }
           );
 
-          if (response.ok) {
-            await fetchState();
-          } else {
-            console.error('Step request failed:', await response.text());
+          if (!response.ok) {
+            throw new Error(await response.text());
           }
+
+          await fetchState();
         } catch (error) {
-          console.error('Step error:', error);
+          console.error("Simulation step failed:", error);
+          setApiError("Simulation step failed. Check the backend logs.");
         }
       }
 
@@ -185,16 +239,19 @@
         try {
           const response = await fetch(
             `${API_BASE}/api/v1/sim/runs/run_live_01/reset`,
-            { method: 'POST' }
+            { method: "POST" }
           );
 
-          if (response.ok) {
-            await fetchState(true);
-          } else {
-            console.error('Reset request failed:', await response.text());
+          if (!response.ok) {
+            throw new Error(await response.text());
           }
+
+          historyRef.current = [];
+          setChartHistory([]);
+          await fetchState(true);
         } catch (error) {
-          console.error('Reset error:', error);
+          console.error("Reset failed:", error);
+          setApiError("Reset failed. Check the backend logs.");
         }
       }
 
@@ -204,11 +261,12 @@
             `${API_BASE}/api/v1/audit/verify?run_id=run_live_01`
           );
 
-          if (response.ok) {
-            setAuditStatus(await response.json());
-          }
+          if (!response.ok) throw new Error(await response.text());
+
+          setAuditStatus(await response.json());
         } catch (error) {
           console.error(error);
+          setApiError("Audit verification failed.");
         }
       }
 
@@ -217,28 +275,27 @@
 
         try {
           const response = await fetch(`${API_BASE}/api/v1/backtests`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               horizon_steps: 168,
               strategies: [
-                'B0_CASH',
-                'B1_FIXED',
-                'B2_CONSERVATIVE',
-                'B3_DYNAMIC',
-                'B4_CHALLENGE'
+                "B0_CASH",
+                "B1_FIXED",
+                "B2_CONSERVATIVE",
+                "B3_DYNAMIC",
+                "B4_CHALLENGE"
               ]
             })
           });
 
-          if (response.ok) {
-            const data = await response.json();
-            setBacktestResults(data.results);
-          } else {
-            console.error('Backtest failed:', await response.text());
-          }
+          if (!response.ok) throw new Error(await response.text());
+
+          const data = await response.json();
+          setBacktestResults(data.results || data);
         } catch (error) {
           console.error(error);
+          setApiError("Backtest failed. Check the backend logs.");
         } finally {
           setBacktestLoading(false);
         }
@@ -247,85 +304,96 @@
       async function handleRunStress() {
         try {
           const response = await fetch(`${API_BASE}/api/v1/stress/events`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               scenario_id: selectedScenario,
-              start_step: kpis ? kpis.step + 1 : 17,
+              start_step: kpis ? Number(kpis.step || 0) + 1 : 1,
               duration_hours: 12
             })
           });
 
-          if (response.ok) {
-            setStressReport(await response.json());
-          } else {
-            console.error('Stress test failed:', await response.text());
-          }
+          if (!response.ok) throw new Error(await response.text());
+
+          setStressReport(await response.json());
         } catch (error) {
           console.error(error);
+          setApiError("Stress test failed. Check the backend logs.");
         }
       }
 
       async function handlePreviewSweep() {
         try {
-          const cents = (parseFloat(sweepAmount) * 100).toString();
+          const amount = Number(sweepAmount);
+
+          if (!Number.isFinite(amount) || amount <= 0) {
+            alert("Enter a valid sweep amount greater than zero.");
+            return;
+          }
 
           const response = await fetch(
             `${API_BASE}/api/v1/treasury/sweeps/preview`,
             {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
                 tier: 1,
-                amount_cents: cents
+                amount_cents: String(Math.round(amount * 100))
               })
             }
           );
 
-          if (response.ok) {
-            setSweepPreview(await response.json());
-          } else {
-            console.error('Preview failed:', await response.text());
-          }
+          if (!response.ok) throw new Error(await response.text());
+
+          setSweepPreview(await response.json());
         } catch (error) {
           console.error(error);
+          setApiError("Sweep preview failed. Check the backend logs.");
         }
       }
 
       async function handleExecuteSweep() {
         try {
-          const cents = (parseFloat(sweepAmount) * 100).toString();
+          const amount = Number(sweepAmount);
+
+          if (!Number.isFinite(amount) || amount <= 0) {
+            alert("Enter a valid sweep amount greater than zero.");
+            return;
+          }
 
           const response = await fetch(
             `${API_BASE}/api/v1/treasury/sweeps`,
             {
-              method: 'POST',
+              method: "POST",
               headers: {
-                'Content-Type': 'application/json',
-                'Idempotency-Key': 'man_swp_' + Date.now()
+                "Content-Type": "application/json",
+                "Idempotency-Key": "manual_sweep_" + Date.now()
               },
               body: JSON.stringify({
                 tier: 1,
-                amount_cents: cents,
+                amount_cents: String(Math.round(amount * 100)),
                 confirm: true
               })
             }
           );
 
-          if (response.ok) {
-            alert('Sweep executed successfully!');
-            setSweepPreview(null);
-            await fetchState();
-          } else {
-            const error = await response.json();
-            alert('Sweep rejected: ' + JSON.stringify(error.detail));
+          if (!response.ok) {
+            throw new Error(await response.text());
           }
+
+          alert("Sweep executed successfully.");
+          setSweepPreview(null);
+          await fetchState();
         } catch (error) {
-          alert('Error executing sweep: ' + error);
+          console.error(error);
+          alert("Sweep failed: " + error.message);
         }
       }
 
-      // Chart: historical snapshots, with separate axes for cash and reserves.
+      // Improved graph:
+      // Cash and repo are lines on the left axis.
+      // Reserve target and hard floor are lines on the right axis.
+      // The two axes prevent the $3B cash balance from flattening reserve lines.
       useEffect(() => {
         if (!chartRef.current || chartHistory.length === 0) return;
 
@@ -335,68 +403,128 @@
 
         const history = chartHistory.slice(-24);
 
-        const reserveMax = Math.max(
+        const maxLiquidity = Math.max(
           1,
-          ...history.map(point => point.reserve || 0),
-          ...history.map(point => point.hardFloor || 0)
-        ) * 1.25;
+          ...history.map(point => point.cash),
+          ...history.map(point => point.repo)
+        ) * 1.1;
 
-        chartInstance.current.setOption({
-          backgroundColor: 'transparent',
-          animationDuration: 250,
+        const maxReserve = Math.max(
+          1,
+          ...history.map(point => point.reserve),
+          ...history.map(point => point.hardFloor)
+        ) * 1.15;
+
+        const option = {
+          backgroundColor: "transparent",
+          animationDuration: 350,
+
+          color: ["#8B98A5", "#3FB7A9", "#4EA1FF", "#FF6B6B"],
 
           tooltip: {
-            trigger: 'axis',
-            confine: true
+            trigger: "axis",
+            confine: true,
+            backgroundColor: "#121923",
+            borderColor: "#1E2A38",
+            textStyle: { color: "#E6EDF3" },
+            formatter: function(params) {
+              if (!params || params.length === 0) return "";
+
+              let result = `<strong>Simulation ${params[0].axisValue}</strong>`;
+
+              params.forEach(item => {
+                result += `<br/>${item.marker}${item.seriesName}: ${formatMillions(item.value)}`;
+              });
+
+              return result;
+            }
           },
 
           legend: {
-            data: [
-              'Cash Buffer',
-              'Repo Position',
-              'R_total (Target)',
-              'F_hard (Floor)'
-            ],
-            textStyle: { color: '#8B98A5' }
+            top: 4,
+            left: "center",
+            itemGap: 16,
+            textStyle: {
+              color: "#B7C2CE",
+              fontSize: 11
+            }
           },
 
           grid: {
-            left: '4%',
-            right: '8%',
-            bottom: '8%',
-            containLabel: true
+            top: 68,
+            left: 72,
+            right: 78,
+            bottom: 48,
+            containLabel: false
           },
 
           xAxis: {
-            type: 'category',
-            name: 'Simulation step',
+            type: "category",
             data: history.map(point => `#${point.step}`),
-            axisLine: { lineStyle: { color: '#1E2A38' } },
-            axisLabel: { color: '#8B98A5' }
+            boundaryGap: false,
+            axisLine: {
+              lineStyle: { color: "#344152" }
+            },
+            axisTick: { show: false },
+            axisLabel: {
+              color: "#A0ADBA",
+              margin: 12,
+              hideOverlap: true
+            },
+            name: "Simulation step",
+            nameLocation: "middle",
+            nameGap: 30,
+            nameTextStyle: {
+              color: "#8B98A5",
+              fontSize: 11
+            }
           },
 
           yAxis: [
             {
-              type: 'value',
-              name: 'Cash / Repo ($)',
+              type: "value",
+              name: "Cash / Repo",
+              min: 0,
+              max: maxLiquidity,
+              position: "left",
+              axisLine: {
+                show: true,
+                lineStyle: { color: "#536273" }
+              },
+              axisTick: { show: false },
               axisLabel: {
-                color: '#8B98A5',
-                formatter: value =>
-                  '$' + (value / 1e6).toFixed(0) + 'M'
+                color: "#A0ADBA",
+                formatter: value => formatMillions(value)
+              },
+              nameTextStyle: {
+                color: "#A0ADBA",
+                padding: [0, 0, 8, 0]
               },
               splitLine: {
-                lineStyle: { color: '#1E2A38' }
+                lineStyle: {
+                  color: "#25303D",
+                  type: "solid"
+                }
               }
             },
             {
-              type: 'value',
-              name: 'Reserve ($)',
+              type: "value",
+              name: "Reserve / Floor",
               min: 0,
-              max: reserveMax,
+              max: maxReserve,
+              position: "right",
+              axisLine: {
+                show: true,
+                lineStyle: { color: "#536273" }
+              },
+              axisTick: { show: false },
               axisLabel: {
-                color: '#8B98A5',
-                formatter: value =>
-                  '$' + (value / 1e6).toFixed(0) + 'M'
+                color: "#A0ADBA",
+                formatter: value => formatMillions(value)
+              },
+              nameTextStyle: {
+                color: "#A0ADBA",
+                padding: [0, 0, 8, 0]
               },
               splitLine: { show: false }
             }
@@ -404,73 +532,91 @@
 
           series: [
             {
-              name: 'Cash Buffer',
-              type: 'bar',
-              stack: 'liquidity',
+              name: "Cash Buffer",
+              type: "line",
               yAxisIndex: 0,
-              color: '#8B98A5',
-              data: history.map(point => point.cash)
-            },
-            {
-              name: 'Repo Position',
-              type: 'bar',
-              stack: 'liquidity',
-              yAxisIndex: 0,
-              color: '#3FB7A9',
-              data: history.map(point => point.repo)
-            },
-            {
-              name: 'R_total (Target)',
-              type: 'line',
-              yAxisIndex: 1,
-              color: '#4EA1FF',
+              data: history.map(point => point.cash),
               showSymbol: true,
-              symbolSize: 6,
-              lineStyle: { width: 3 },
-              data: history.map(point => point.reserve)
-            },
-            {
-              name: 'F_hard (Floor)',
-              type: 'line',
-              yAxisIndex: 1,
-              color: '#FF6B6B',
-              showSymbol: true,
+              symbol: "circle",
               symbolSize: 5,
-              lineStyle: { type: 'dashed', width: 2 },
-              data: history.map(point => point.hardFloor)
+              smooth: false,
+              lineStyle: { width: 3 },
+              emphasis: { focus: "series" }
+            },
+            {
+              name: "Repo Position",
+              type: "line",
+              yAxisIndex: 0,
+              data: history.map(point => point.repo),
+              showSymbol: true,
+              symbol: "circle",
+              symbolSize: 5,
+              smooth: false,
+              lineStyle: { width: 2 },
+              emphasis: { focus: "series" }
+            },
+            {
+              name: "R_total (Target)",
+              type: "line",
+              yAxisIndex: 1,
+              data: history.map(point => point.reserve),
+              showSymbol: true,
+              symbol: "circle",
+              symbolSize: 7,
+              smooth: false,
+              lineStyle: { width: 3 },
+              emphasis: { focus: "series" }
+            },
+            {
+              name: "F_hard (Floor)",
+              type: "line",
+              yAxisIndex: 1,
+              data: history.map(point => point.hardFloor),
+              showSymbol: true,
+              symbol: "circle",
+              symbolSize: 6,
+              smooth: false,
+              lineStyle: {
+                width: 2,
+                type: "dashed"
+              },
+              emphasis: { focus: "series" }
             }
           ]
-        }, true);
+        };
+
+        chartInstance.current.setOption(option, true);
+        chartInstance.current.resize();
       }, [chartHistory, tab]);
 
       useEffect(() => {
-        const resizeChart = () => {
+        function resizeChart() {
           if (chartInstance.current) {
             chartInstance.current.resize();
           }
-        };
+        }
 
-        window.addEventListener('resize', resizeChart);
+        window.addEventListener("resize", resizeChart);
 
         return () => {
-          window.removeEventListener('resize', resizeChart);
+          window.removeEventListener("resize", resizeChart);
         };
       }, []);
 
-      useEffect(() => {
-        return () => {
-          if (chartInstance.current) {
-            chartInstance.current.dispose();
-            chartInstance.current = null;
-          }
-        };
-      }, []);
+      const tabs = [
+        "dashboard",
+        "forecast",
+        "sweep",
+        "backtest",
+        "stress",
+        "audit"
+      ];
 
       return (
         <div className="flex flex-col min-h-screen">
 
           <header className="border-b border-borderDark bg-panelDark px-6 py-4 flex flex-wrap items-center justify-between gap-4 sticky top-0 z-50">
-            <div className="flex items-center flex-wrap gap-3">
+            <div className="flex flex-wrap items-center gap-3">
               <span className="text-xl font-bold tracking-wider text-accentBlue">
                 ⚡ RESERVE JUGGLER
               </span>
@@ -485,14 +631,14 @@
             </div>
 
             <nav className="flex flex-wrap gap-1 bg-bgDark p-1 rounded-lg border border-borderDark text-sm">
-              {['dashboard', 'forecast', 'sweep', 'backtest', 'stress', 'audit'].map(name => (
+              {tabs.map(name => (
                 <button
                   key={name}
                   onClick={() => setTab(name)}
                   className={`px-3 py-1.5 rounded-md capitalize font-medium ${
                     tab === name
-                      ? 'bg-panelDark text-accentBlue border border-borderDark'
-                      : 'text-textMuted hover:text-textLight'
+                      ? "bg-panelDark text-accentBlue border border-borderDark"
+                      : "text-textMuted hover:text-textLight"
                   }`}
                 >
                   {name}
@@ -512,11 +658,11 @@
                 onClick={() => setIsRunning(value => !value)}
                 className={`px-3 py-1.5 rounded text-sm font-semibold ${
                   isRunning
-                    ? 'bg-amber-600 hover:bg-amber-700 text-white'
-                    : 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                    ? "bg-amber-600 hover:bg-amber-700 text-white"
+                    : "bg-emerald-600 hover:bg-emerald-700 text-white"
                 }`}
               >
-                {isRunning ? '⏸ Pause' : '▶ Auto-Play'}
+                {isRunning ? "⏸ Pause" : "▶ Auto-Play"}
               </button>
 
               <button
@@ -530,13 +676,25 @@
 
           <main className="flex-1 p-6 max-w-7xl mx-auto w-full space-y-6">
 
+            {apiError && (
+              <div className="bg-red-950 border border-red-800 text-red-300 p-3 rounded-lg text-sm">
+                {apiError}
+                <button
+                  onClick={() => setApiError("")}
+                  className="float-right font-bold px-2"
+                >
+                  ✕
+                </button>
+              </div>
+            )}
+
             {/* KPI cards */}
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
 
               <div className="bg-panelDark border border-borderDark p-4 rounded-xl">
                 <div className="text-xs text-textMuted uppercase tracking-wide">Cash Buffer</div>
                 <div className="text-lg font-bold mono-num mt-1">
-                  {kpis ? formatUSD(kpis.cash_cents) : '...'}
+                  {kpis ? formatUSD(kpis.cash_cents) : "..."}
                 </div>
                 <div className="text-xs text-emerald-400 mt-1">Immediate Liquidity</div>
               </div>
@@ -544,7 +702,7 @@
               <div className="bg-panelDark border border-borderDark p-4 rounded-xl">
                 <div className="text-xs text-textMuted uppercase tracking-wide">Reserve Floor</div>
                 <div className="text-lg font-bold text-accentBlue mono-num mt-1">
-                  {kpis ? formatUSD(kpis.r_total_cents) : '...'}
+                  {kpis ? formatUSD(kpis.r_total_cents) : "..."}
                 </div>
                 <div className="text-xs text-textMuted mt-1">Probabilistic + Hard Floor</div>
               </div>
@@ -553,10 +711,10 @@
                 <div className="text-xs text-textMuted uppercase tracking-wide">Headroom</div>
                 <div className={`text-lg font-bold mono-num mt-1 ${
                   kpis && Number(kpis.headroom_cents) < 0
-                    ? 'text-red-400'
-                    : 'text-emerald-400'
+                    ? "text-red-400"
+                    : "text-emerald-400"
                 }`}>
-                  {kpis ? formatUSD(kpis.headroom_cents) : '...'}
+                  {kpis ? formatUSD(kpis.headroom_cents) : "..."}
                 </div>
                 <div className="text-xs text-textMuted mt-1">Cash minus R_total</div>
               </div>
@@ -564,7 +722,7 @@
               <div className="bg-panelDark border border-borderDark p-4 rounded-xl">
                 <div className="text-xs text-textMuted uppercase tracking-wide">Tier 1 Repo Vault</div>
                 <div className="text-lg font-bold text-tierRepo mono-num mt-1">
-                  {kpis ? formatUSD(kpis.repo_cents) : '...'}
+                  {kpis ? formatUSD(kpis.repo_cents) : "..."}
                 </div>
                 <div className="text-xs text-textMuted mt-1">
                   {kpis ? kpis.open_repos : 0} open positions
@@ -574,7 +732,7 @@
               <div className="bg-panelDark border border-borderDark p-4 rounded-xl">
                 <div className="text-xs text-textMuted uppercase tracking-wide">Cumulative Net Yield</div>
                 <div className="text-lg font-bold text-amber-400 mono-num mt-1">
-                  {kpis ? formatUSD(kpis.cumulative_net_pnl_cents) : '...'}
+                  {kpis ? formatUSD(kpis.cumulative_net_pnl_cents) : "..."}
                 </div>
                 <div className="text-xs text-textMuted mt-1">Net of Penalties</div>
               </div>
@@ -582,7 +740,7 @@
               <div className="bg-panelDark border border-borderDark p-4 rounded-xl">
                 <div className="text-xs text-textMuted uppercase tracking-wide">Payout Success</div>
                 <div className="text-lg font-bold text-emerald-400 mono-num mt-1">
-                  {kpis ? `${kpis.payout_success.success_rate_pct}%` : '100%'}
+                  {kpis ? `${kpis.payout_success.success_rate_pct}%` : "100%"}
                 </div>
                 <div className="text-xs text-textMuted mt-1">
                   {kpis ? kpis.payout_success.failed_events : 0} shortfalls
@@ -592,25 +750,27 @@
             </div>
 
             {/* Dashboard */}
-            {tab === 'dashboard' && (
+            {tab === "dashboard" && (
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
-                <div className="lg:col-span-2 bg-panelDark border border-borderDark rounded-xl p-5">
+                <div className="lg:col-span-2 bg-panelDark border border-borderDark rounded-xl p-5 min-w-0">
                   <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
                     <h3 className="font-bold text-base">
-                      Real-Time Liquidity Stack & Safety Bounds
+                      Liquidity & Safety Bounds
                     </h3>
                     <span className="text-xs text-textMuted">
-                      Ledger Balance vs Reserve Target
+                      Cash / Repo on left · Reserves on right
                     </span>
                   </div>
-                  <div ref={chartRef} className="h-80 w-full"></div>
-                  {chartHistory.length === 0 && (
-                    <p className="text-sm text-textMuted">Loading chart data...</p>
-                  )}
+
+                  <div ref={chartRef} className="w-full" style={{ height: "360px" }}></div>
+
+                  <p className="text-xs text-textMuted mt-2">
+                    Last {chartHistory.length} recorded simulation steps. Click Step 1h to add a new point.
+                  </p>
                 </div>
 
-                <div className="bg-panelDark border border-borderDark rounded-xl p-5">
+                <div className="bg-panelDark border border-borderDark rounded-xl p-5 min-w-0">
                   <div className="flex items-center justify-between mb-3 border-b border-borderDark pb-2">
                     <h3 className="font-bold">Live Decision Feed</h3>
                     <span className="text-xs text-accentBlue">
@@ -618,14 +778,19 @@
                     </span>
                   </div>
 
-                  <div className="space-y-2.5 overflow-y-auto max-h-80 pr-1 text-xs font-mono">
-                    {decisions.map(d => (
-                      <div key={d.seq} className="p-2.5 rounded bg-bgDark border border-borderDark">
+                  <div className="space-y-2.5 overflow-y-auto max-h-96 pr-1 text-xs font-mono">
+                    {decisions.map((d, index) => (
+                      <div
+                        key={d.seq ?? index}
+                        className="p-2.5 rounded bg-bgDark border border-borderDark"
+                      >
                         <div className="flex justify-between gap-2 text-textMuted">
                           <span className="font-bold text-accentBlue">
                             STEP #{d.step_index}
                           </span>
-                          <span className="truncate">{d.record_hash}</span>
+                          <span className="truncate max-w-32">
+                            {d.record_hash}
+                          </span>
                         </div>
                         <div className="font-semibold mt-1">{d.action}</div>
                         <div className="text-textMuted mt-1">{d.reason}</div>
@@ -644,25 +809,24 @@
             )}
 
             {/* Forecast */}
-            {tab === 'forecast' && (
+            {tab === "forecast" && (
               <div className="bg-panelDark border border-borderDark rounded-xl p-6 space-y-6">
                 <div className="border-b border-borderDark pb-4">
                   <h2 className="text-lg font-bold">Forecast Engine & Quantile Fan</h2>
                   <p className="text-xs text-textMuted">
-                    Deposit and withdrawal forecasts by horizon.
+                    Forecast deposit inflows and withdrawal outflows.
                   </p>
                 </div>
 
-                {forecastData && (
+                {forecastData ? (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-
                     <div className="space-y-4">
                       <h4 className="font-bold text-sm text-tierRepo uppercase">
                         Deposit Inflow Quantiles
                       </h4>
                       <div className="space-y-2 text-xs font-mono">
-                        {(forecastData.deposits || []).map(d => (
-                          <div key={d.horizon_h} className="p-3 bg-bgDark rounded border border-borderDark flex flex-wrap justify-between gap-2">
+                        {(forecastData.deposits || []).map((d, i) => (
+                          <div key={d.horizon_h ?? i} className="p-3 bg-bgDark rounded border border-borderDark flex flex-wrap justify-between gap-2">
                             <span className="text-accentBlue font-bold">+{d.horizon_h}h</span>
                             <span>P50: {formatUSD(d.p50_cents)}</span>
                             <span>P95: {formatUSD(d.p95_cents)}</span>
@@ -677,8 +841,8 @@
                         Withdrawal Outflow Quantiles
                       </h4>
                       <div className="space-y-2 text-xs font-mono">
-                        {(forecastData.withdrawals || []).map(w => (
-                          <div key={w.horizon_h} className="p-3 bg-bgDark rounded border border-borderDark flex flex-wrap justify-between gap-2">
+                        {(forecastData.withdrawals || []).map((w, i) => (
+                          <div key={w.horizon_h ?? i} className="p-3 bg-bgDark rounded border border-borderDark flex flex-wrap justify-between gap-2">
                             <span className="text-amber-400 font-bold">+{w.horizon_h}h</span>
                             <span>P50: {formatUSD(w.p50_cents)}</span>
                             <span>P95: {formatUSD(w.p95_cents)}</span>
@@ -687,18 +851,15 @@
                         ))}
                       </div>
                     </div>
-
                   </div>
-                )}
-
-                {!forecastData && (
+                ) : (
                   <p className="text-textMuted text-sm">Forecast data is loading or unavailable.</p>
                 )}
               </div>
             )}
 
-            {/* Manual sweep */}
-            {tab === 'sweep' && (
+            {/* Sweep */}
+            {tab === "sweep" && (
               <div className="max-w-2xl mx-auto bg-panelDark border border-borderDark rounded-xl p-6 space-y-6">
                 <div>
                   <h2 className="text-lg font-bold">Manual Treasury Sweep Order</h2>
@@ -731,11 +892,7 @@
                   <button
                     onClick={handleExecuteSweep}
                     disabled={!sweepPreview || !sweepPreview.valid}
-                    className={`flex-1 py-2.5 rounded font-semibold text-sm ${
-                      sweepPreview && sweepPreview.valid
-                        ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
-                        : 'bg-borderDark text-textMuted cursor-not-allowed'
-                    }`}
+                    className="flex-1 bg-emerald-700 hover:bg-emerald-600 py-2.5 rounded font-semibold text-sm"
                   >
                     Execute Sweep
                   </button>
@@ -745,8 +902,8 @@
                   <div className="p-4 bg-bgDark rounded-lg border border-borderDark space-y-2 text-xs font-mono">
                     <div className="flex justify-between gap-2">
                       <span className="text-textMuted">Sweep Status:</span>
-                      <span className={sweepPreview.valid ? 'text-emerald-400' : 'text-red-400'}>
-                        {sweepPreview.valid ? 'VALID' : 'REJECTED'}
+                      <span className={sweepPreview.valid ? "text-emerald-400" : "text-red-400"}>
+                        {sweepPreview.valid ? "VALID" : "REJECTED"}
                       </span>
                     </div>
                     <div className="flex justify-between gap-2">
@@ -759,7 +916,7 @@
                     </div>
                     {sweepPreview.reason_codes?.length > 0 && (
                       <div className="text-red-400 pt-2 border-t border-borderDark">
-                        Rejection Reasons: {sweepPreview.reason_codes.join(', ')}
+                        Rejection Reasons: {sweepPreview.reason_codes.join(", ")}
                       </div>
                     )}
                   </div>
@@ -768,7 +925,7 @@
             )}
 
             {/* Backtest */}
-            {tab === 'backtest' && (
+            {tab === "backtest" && (
               <div className="bg-panelDark border border-borderDark rounded-xl p-6 space-y-6">
                 <div className="flex flex-wrap justify-between items-center gap-3 border-b border-borderDark pb-4">
                   <div>
@@ -777,13 +934,12 @@
                       168-hour replay comparing treasury strategies.
                     </p>
                   </div>
-
                   <button
                     onClick={handleRunBacktest}
                     disabled={backtestLoading}
-                    className="bg-accentBlue hover:bg-blue-600 text-bgDark px-4 py-2 rounded font-bold text-sm disabled:opacity-50"
+                    className="bg-accentBlue hover:bg-blue-600 text-bgDark px-4 py-2 rounded font-bold text-sm"
                   >
-                    {backtestLoading ? 'Running Replay...' : 'Run Backtest Replay'}
+                    {backtestLoading ? "Running Replay..." : "Run Backtest Replay"}
                   </button>
                 </div>
 
@@ -802,15 +958,15 @@
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-borderDark">
-                        {backtestResults.map(r => (
-                          <tr key={r.strategy_id}>
+                        {(Array.isArray(backtestResults) ? backtestResults : []).map((r, i) => (
+                          <tr key={r.strategy_id ?? i}>
                             <td className="p-3 font-bold text-accentBlue">{r.strategy_id}</td>
                             <td className="p-3">{r.status}</td>
                             <td className="p-3">{r.payout_success_steps_pct}%</td>
-                            <td className="p-3">{formatUSD(r.gross_yield_usd * 100)}</td>
-                            <td className="p-3 text-amber-400">{formatUSD(r.net_yield_usd * 100)}</td>
-                            <td className="p-3">{formatUSD(r.overdraft_peak_usd * 100)}</td>
-                            <td className="p-3">{formatUSD(r.avg_cash_usd * 100)}</td>
+                            <td className="p-3">{formatUSD(Number(r.gross_yield_usd || 0) * 100)}</td>
+                            <td className="p-3 text-amber-400">{formatUSD(Number(r.net_yield_usd || 0) * 100)}</td>
+                            <td className="p-3">{formatUSD(Number(r.overdraft_peak_usd || 0) * 100)}</td>
+                            <td className="p-3">{formatUSD(Number(r.avg_cash_usd || 0) * 100)}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -820,13 +976,13 @@
               </div>
             )}
 
-            {/* Stress testing */}
-            {tab === 'stress' && (
+            {/* Stress */}
+            {tab === "stress" && (
               <div className="bg-panelDark border border-borderDark rounded-xl p-6 space-y-6">
                 <div>
                   <h2 className="text-lg font-bold">Stress Testing Scenario Injector</h2>
                   <p className="text-xs text-textMuted">
-                    Test the treasury against adverse scenarios.
+                    Test treasury resilience under adverse scenarios.
                   </p>
                 </div>
 
@@ -869,7 +1025,7 @@
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div>Min Stressed Cash: {formatUSD(stressReport.min_cash_stressed_cents)}</div>
                       <div>Peak Overdraft: {formatUSD(stressReport.overdraft_peak_stressed_cents)}</div>
-                      <div>Net P&L Impact: {formatUSD(stressReport.net_pnl_delta_cents)}</div>
+                      <div>Net P&amp;L Impact: {formatUSD(stressReport.net_pnl_delta_cents)}</div>
                       <div>Payout Shortfalls: {stressReport.payout_failures_stressed}</div>
                     </div>
                   </div>
@@ -878,16 +1034,15 @@
             )}
 
             {/* Audit */}
-            {tab === 'audit' && (
+            {tab === "audit" && (
               <div className="bg-panelDark border border-borderDark rounded-xl p-6 space-y-6">
                 <div className="flex flex-wrap justify-between items-center gap-3 border-b border-borderDark pb-4">
                   <div>
                     <h2 className="text-lg font-bold">Tamper-Evident SHA-256 Audit Trail</h2>
                     <p className="text-xs text-textMuted">
-                      Verify the integrity of the audit chain.
+                      Verify the integrity of the recorded audit chain.
                     </p>
                   </div>
-
                   <button
                     onClick={handleVerifyAudit}
                     className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded font-bold text-sm"
@@ -899,17 +1054,15 @@
                 {auditStatus && (
                   <div className={`p-4 rounded-lg border font-mono text-xs ${
                     auditStatus.valid
-                      ? 'bg-emerald-950/50 border-emerald-800 text-emerald-300'
-                      : 'bg-red-950/50 border-red-800 text-red-300'
+                      ? "bg-emerald-950/50 border-emerald-800 text-emerald-300"
+                      : "bg-red-950/50 border-red-800 text-red-300"
                   }`}>
                     <div className="font-bold text-sm">
                       {auditStatus.valid
-                        ? 'AUDIT CHAIN VERIFIED'
-                        : 'AUDIT CHAIN COMPROMISED'}
+                        ? "AUDIT CHAIN VERIFIED"
+                        : "AUDIT CHAIN COMPROMISED"}
                     </div>
-                    <div>
-                      Checked Records: {auditStatus.checked_records}
-                    </div>
+                    <div>Checked Records: {auditStatus.checked_records}</div>
                   </div>
                 )}
 
@@ -917,16 +1070,15 @@
                   <h4 className="text-xs uppercase text-textMuted font-bold">
                     Recent Cryptographic Records
                   </h4>
-
                   <div className="space-y-2 font-mono text-xs">
-                    {decisions.slice(0, 8).map(d => (
-                      <div key={d.seq} className="p-3 bg-bgDark rounded border border-borderDark flex flex-wrap justify-between gap-2">
+                    {decisions.slice(0, 8).map((d, i) => (
+                      <div key={d.seq ?? i} className="p-3 bg-bgDark rounded border border-borderDark flex flex-wrap justify-between gap-2">
                         <div>
                           <span className="font-bold text-accentBlue">Seq #{d.seq}</span>
-                          {' · '}
+                          {" · "}
                           <span>{d.action}</span>
                         </div>
-                        <div className="text-textMuted">
+                        <div className="text-textMuted break-all">
                           Prev: {d.prev_hash} → Hash: {d.record_hash}
                         </div>
                       </div>
@@ -949,7 +1101,7 @@
       );
     }
 
-    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+    ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   </script>
 </body>
 </html>
