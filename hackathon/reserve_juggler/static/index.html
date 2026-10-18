@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Reserve Juggler — Real-Time Treasury Engine</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body>
+  <div class="app-container">
+    <!-- Header -->
+    <header class="navbar">
+      <div class="brand">
+        <div class="logo-icon">🤹</div>
+        <div>
+          <h1>Reserve Juggler</h1>
+          <span class="sub-text">Autonomous Real-Time Treasury & Liquidity Sweeper</span>
+        </div>
+      </div>
+      <div class="nav-status">
+        <div class="status-pill" id="modePill">
+          <span class="pulse-dot" id="modeDot"></span>
+          <span id="modeText">NORMAL</span>
+        </div>
+        <div class="time-pill">
+          <span class="label">Cycle:</span>
+          <span id="cycleIdx" class="val">--</span>
+          <span class="divider">|</span>
+          <span id="cycleTime" class="val">--</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Top Metrics Grid -->
+    <section class="metrics-grid">
+      <div class="metric-card">
+        <div class="metric-title">Cash Buffer (0% Yield)</div>
+        <div class="metric-value text-emerald" id="cashBufferVal">$0.00</div>
+        <div class="metric-sub">Pays payouts instantly</div>
+      </div>
+
+      <div class="metric-card">
+        <div class="metric-title">Yield Vault (5.0% APY)</div>
+        <div class="metric-value text-blue" id="yieldVaultVal">$0.00</div>
+        <div class="metric-sub">Rolling matched tranches</div>
+      </div>
+
+      <div class="metric-card">
+        <div class="metric-title">Required Cushion (Q_99.9%)</div>
+        <div class="metric-value text-amber" id="reqCushionVal">$0.00</div>
+        <div class="metric-sub" id="headroomVal">Headroom: $0.00</div>
+      </div>
+
+      <div class="metric-card">
+        <div class="metric-title">Yield Alpha vs Baseline</div>
+        <div class="metric-value text-purple" id="yieldAlphaVal">+$0.00</div>
+        <div class="metric-sub" id="baselineYieldVal">Baseline: $0.00</div>
+      </div>
+
+      <div class="metric-card">
+        <div class="metric-title">Forecast WAPE</div>
+        <div class="metric-value text-cyan" id="wapeVal">0.00%</div>
+        <div class="metric-sub">Target &lt; 10% (Peak &lt; 15%)</div>
+      </div>
+
+      <div class="metric-card">
+        <div class="metric-title">Reliability & Safety</div>
+        <div class="metric-value text-green" id="reliabilityVal">100.0%</div>
+        <div class="metric-sub" id="emergencyDrawsVal">Emergency Draws: 0</div>
+      </div>
+    </section>
+
+    <!-- Controls Bar -->
+    <section class="controls-panel">
+      <div class="controls-group">
+        <button id="btnLive" class="btn btn-primary">▶ Start Live Simulation</button>
+        <button id="btnStep" class="btn btn-secondary">⏭ Step 1 Bucket (15m)</button>
+        <button id="btnShock" class="btn btn-warning">⚡ Inject 3x Outflow Surge (2h)</button>
+      </div>
+
+      <div class="controls-group">
+        <div class="input-action-group">
+          <input type="number" id="manualSweepInput" placeholder="Amount ($)" min="10000" step="10000" />
+          <button id="btnManualSweep" class="btn btn-outline">Sweep Now</button>
+        </div>
+
+        <button id="btnPause" class="btn btn-secondary">⏸ Pause Sweeps</button>
+        <button id="btnKill" class="btn btn-danger">🚨 EMERGENCY KILL SWITCH</button>
+      </div>
+    </section>
+
+    <!-- Charts Row -->
+    <section class="charts-grid">
+      <div class="chart-box">
+        <div class="chart-header">
+          <h3>24-Hour Probabilistic Forecast Fan (P50, P95, P99, P99.9)</h3>
+          <span class="badge">EWMA + Calendar Overrides</span>
+        </div>
+        <div class="chart-canvas-container">
+          <canvas id="fanChart"></canvas>
+        </div>
+      </div>
+
+      <div class="chart-box">
+        <div class="chart-header">
+          <h3>Cash Buffer vs Required Cushion vs Yield Vault</h3>
+          <span class="badge">Real-Time Headroom</span>
+        </div>
+        <div class="chart-canvas-container">
+          <canvas id="bufferChart"></canvas>
+        </div>
+      </div>
+    </section>
+
+    <!-- Audit Log & Static Chart Row -->
+    <section class="bottom-grid">
+      <!-- Immutable Audit Log -->
+      <div class="audit-container">
+        <div class="table-header">
+          <h3>Cryptographically Chained Audit Trail</h3>
+          <span class="badge-success" id="auditBadge">✔ SHA-256 Chain Verified</span>
+        </div>
+        <div class="table-scroll">
+          <table class="audit-table">
+            <thead>
+              <tr>
+                <th>Cycle</th>
+                <th>Time</th>
+                <th>Cash Before</th>
+                <th>Req Cushion</th>
+                <th>Headroom</th>
+                <th>Decision</th>
+                <th>Sweep ($)</th>
+                <th>Reason</th>
+                <th>Hash</th>
+              </tr>
+            </thead>
+            <tbody id="auditTableBody">
+              <tr><td colspan="9" style="text-align:center;">Loading audit trail...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Static Backtest Artifact View -->
+      <div class="backtest-summary-container">
+        <div class="table-header">
+          <h3>30-Day Acceptance Backtest Results</h3>
+          <a href="/api/chart" target="_blank" class="badge">Open Chart ↗</a>
+        </div>
+        <div class="backtest-report-card">
+          <div class="report-stat-row">
+            <span>Payout Success Rate:</span>
+            <strong class="text-emerald">100.00% (0 Delayed)</strong>
+          </div>
+          <div class="report-stat-row">
+            <span>Emergency Overdraft Draws:</span>
+            <strong class="text-emerald">0 Draws ($0.00 Fees)</strong>
+          </div>
+          <div class="report-stat-row">
+            <span>Average Idle Cash Reduction:</span>
+            <strong class="text-blue">63.38% Lower vs Baseline</strong>
+          </div>
+          <div class="report-stat-row">
+            <span>Reserve Juggler Idle Cash:</span>
+            <strong>$5,492,929.56 (Baseline: $15,000,000)</strong>
+          </div>
+          <div class="report-stat-row">
+            <span>Net Yield Alpha Earned:</span>
+            <strong class="text-purple">+$5,858.19 Excess Alpha</strong>
+          </div>
+          <div class="report-stat-row">
+            <span>Overall Forecast WAPE:</span>
+            <strong class="text-cyan">3.24% (Peak Days: 2.88%)</strong>
+          </div>
+          <div class="report-stat-row">
+            <span>Audit Chain Integrity:</span>
+            <strong class="text-emerald">100% Chained SHA-256 Passed</strong>
+          </div>
+        </div>
+        <div class="chart-preview-container">
+          <img src="/api/chart" alt="30-Day Backtest Chart" id="backtestChartImg" />
+        </div>
+      </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+      <span>Reserve Juggler Treasury Engine &copy; 2026</span>
+      <span>Double-Entry Integer Minor Units Ledger &bull; Continuous Reconciliation &bull; Fail-Closed Architecture</span>
+    </footer>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,70 @@
+# Reserve Juggler — Treasury Configuration
+# Mode: SIMULATION-ONLY
+
+evaluation_policy: as_of_only  # 'as_of_only' or 'full_replay'
+as_of_timestamp: "2026-10-17T00:00:00Z"
+
+# U1: Opening balances & structural funding
+opening_cash_usd: 3000000000.00  # $3.0B illustrative default
+opening_customer_deposits_usd: 3000000000.00
+funding_mode: none  # 'none' or 'neutralize_drift'
+
+# U2: Timezone
+timezone: UTC
+
+# U3: Operational cash floor
+min_cash_floor_usd: 25000000.00  # $25M
+
+# U4: Repo mechanics
+repo_sweep_window_hour: 17
+repo_sweep_mature_hour: 8
+repo_tenor_hours: 15
+repo_min_sweep_usd: 1000000.00
+repo_max_pct_of_portfolio: 70.0
+
+# U5: Early repo redemption
+tier1_early_redemption_haircut_pct: 0.5
+tier1_early_redemption_interest_forfeited: true
+
+# U6: Bond mechanics
+bond_settlement_lag_hours: 24
+bond_min_hold_hours: 24
+bond_max_pct_of_portfolio: 25.0
+tier2_bond_liquidation_haircut_pct: 2.0
+
+# U7: Equity mechanics
+stock_settlement_lag_hours: 48
+stock_min_hold_hours: 168
+stock_max_pct_of_portfolio: 0.0  # Economically excluded by default
+stock_expected_annual_return_pct: 0.0
+tier3_stock_liquidation_haircut_pct: 15.0
+
+# U8: Emergency overdraft
+overdraft_limit_usd: 100000000.00  # $100M
+emergency_overdraft_penalty_apr_pct: 12.0
+overdraft_arrangement_fee_bps: 0
+
+# U9: Payout failure semantics
+payout_priority: FIFO
+
+# U10: Intra-step ordering
+transaction_ordering: inflow_before_outflow  # or outflow_before_inflow
+
+# U11: Merchant / deposit credit in hard floor
+inflow_credit_pct: 0.0  # 0% credit in hard constraint
+
+# U12: Yield day-count convention
+day_count_convention: FIXED_365_8760
+
+# U14: Equity volatility for risk
+stock_realized_vol_pct: 25.0
+
+# U17: Challenge benchmark
+challenge_benchmark_apy_pct: 5.00
+
+# Reserve parameters
+alpha_quantile: 0.99
+model_risk_margin_pct: 10.0
+stress_addon_k: 3.0
+bootstrap_paths: 2000
+bootstrap_block_size: 6
