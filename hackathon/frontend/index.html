@@ -1,404 +1,1223 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Reserve Juggler</title>
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Reserve Juggler — Institutional Treasury Engine</title>
 
-<style>
-*{box-sizing:border-box}
-body{margin:0;background:#0b1016;color:#dce6f2;font:12px Arial,sans-serif}
-.topbar{height:auto;min-height:58px;display:flex;align-items:center;gap:12px;padding:12px 16px;background:#0e141c;border-bottom:1px solid #24303d;flex-wrap:wrap}
-.brand{font-size:15px;font-weight:bold;color:#3994ff;letter-spacing:1px}
-.tag{font-size:9px;padding:5px 7px;border:1px solid #2d5da0;color:#64a7ff;background:#14263e;border-radius:3px}
-.tag.green{border-color:#126a52;color:#20d8a0;background:#102c27}
-nav{display:flex;gap:3px;margin:auto;background:#0a1017;border:1px solid #263341;border-radius:8px;padding:4px}
-nav button{background:transparent;color:#8ea0b4;border:0;padding:9px 10px;border-radius:5px;cursor:pointer}
-nav button.active{color:#63a8ff;background:#142338}
-.actions{display:flex;gap:6px}
-button{cursor:pointer}
-.btn{border:1px solid #2c3947;background:#131d28;color:#dbe6f2;border-radius:5px;padding:9px;font-weight:bold}
-.btn.green{background:#00a77c;color:white}
-.btn.red{background:#4a2027;color:#ff8a94}
-main{max-width:920px;margin:26px auto;padding:0 10px 45px}
-.kpis{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px;margin-bottom:17px}
-.kpi{background:#121a24;border:1px solid #1d2936;border-radius:9px;padding:12px 10px;min-height:72px;overflow:hidden}
-.label{color:#8c9caf;font-size:9px;text-transform:uppercase;margin-bottom:6px}
-.value{font-size:13px;font-weight:bold;white-space:nowrap}
-.green-text{color:#00d49a}
-.gold{color:#f5bb3b}
-.sub{color:#8a9aab;font-size:9px;margin-top:6px}
-.dot{display:inline-block;width:5px;height:5px;border-radius:50%;background:#00d49a;margin-right:4px}
-.content{display:grid;grid-template-columns:minmax(0,1.75fr) minmax(260px,.85fr);gap:16px}
-.panel{background:#121a24;border:1px solid #1d2936;border-radius:10px;padding:15px;min-height:287px}
-.panel-head{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:12px}
-.panel h2{font-size:12px;margin:0}
-.muted{color:#8291a3;font-size:9px}
-.chart-wrap{height:222px}
-.feed{display:flex;flex-direction:column;gap:8px}
-.event{background:#0d141d;border:1px solid #26313d;border-radius:4px;padding:10px}
-.event-top{display:flex;justify-content:space-between;color:#5ca5ff;font-weight:bold;font-size:9px;margin-bottom:6px}
-.event strong{display:block;font-size:9px}
-.event small{display:block;color:#8493a5;font-size:8px;margin-top:5px}
-.count{color:#6dafff;border:1px solid #25394f;padding:3px 6px;font-size:9px}
-.notice{margin-top:12px;color:#8291a3;font-size:10px}
-footer{position:fixed;bottom:0;left:0;right:0;min-height:27px;border-top:1px solid #202b36;background:#0d141c;display:flex;align-items:center;justify-content:space-between;padding:6px 12px;color:#8291a3;font:9px monospace;gap:8px}
-@media(max-width:900px){
-nav{order:3;width:100%;overflow-x:auto}
-main{margin:18px 8px 40px}
-.kpis{grid-template-columns:repeat(3,minmax(0,1fr))}
-.content{grid-template-columns:1fr}
-}
-@media(max-width:480px){
-.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
-.value{font-size:11px}
-.panel{padding:11px}
-.chart-wrap{height:230px}
-footer{font-size:7px}
-}
-</style>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+@@ -35,8 +34,7 @@
+
+  <style>
+    body {
+      margin: 0;
+      background: #0B0F14;
+      background-color: #0B0F14;
+      color: #E6EDF3;
+      font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
+    }
+@@ -45,11 +43,6 @@
+      font-variant-numeric: tabular-nums;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+
+    button:disabled {
+      opacity: .5;
+      cursor: not-allowed;
+    }
+  </style>
 </head>
 
-<body>
-<header class="topbar">
-  <div class="brand">ϟ RESERVE JUGGLER</div>
-  <span class="tag">SIMULATION-ONLY</span>
-  <span class="tag green">CYCLE #1 (REPLAY)</span>
+@@ -61,37 +54,16 @@
+    const API_BASE = window.location.origin;
 
-  <nav>
-    <button class="active" data-tab="Dashboard">Dashboard</button>
-    <button data-tab="Forecast">Forecast</button>
-    <button data-tab="Sweep">Sweep</button>
-    <button data-tab="Backtest">Backtest</button>
-    <button data-tab="Stress">Stress</button>
-    <button data-tab="Audit">Audit</button>
-  </nav>
+    function formatUSD(cents) {
+      if (cents === undefined || cents === null || !Number.isFinite(Number(cents))) {
+        return "$0.00";
+      }
+      if (cents === undefined || cents === null) return "$0.00";
 
-  <div class="actions">
-    <button class="btn" id="stepBtn">▷ Step 1h</button>
-    <button class="btn green" id="playBtn">▶ Auto-Play</button>
-    <button class="btn red" id="resetBtn">↻ Reset</button>
-  </div>
-</header>
+      return new Intl.NumberFormat("en-US", {
+        style: "currency",
+        currency: "USD",
+        maximumFractionDigits: 2
+      return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'USD'
+      }).format(Number(cents) / 100);
+    }
 
-<main>
-  <section class="kpis">
-    <div class="kpi">
-      <div class="label">Cash Buffer</div>
-      <div class="value" id="cash">$2,999,807,204.09</div>
-      <div class="sub"><span class="dot"></span>Immediate Liquidity</div>
-    </div>
+    function formatMillions(value) {
+      const n = Number(value) || 0;
 
-    <div class="kpi">
-      <div class="label">Reserve Floor (R_total)</div>
-      <div class="value" id="floor">$73,695,219.50</div>
-      <div class="sub">Probabilistic + Hard Floor</div>
-    </div>
+      if (Math.abs(n) >= 1e9) {
+        return "$" + (n / 1e9).toFixed(2) + "B";
+      }
 
-    <div class="kpi">
-      <div class="label">Headroom</div>
-      <div class="value green-text" id="headroom">$2,926,111,984.59</div>
-      <div class="sub">Cash minus R_total</div>
-    </div>
+      if (Math.abs(n) >= 1e6) {
+        return "$" + (n / 1e6).toFixed(1) + "M";
+      }
 
-    <div class="kpi">
-      <div class="label">Tier 1 Repo Vault</div>
-      <div class="value" id="repo">$0.00</div>
-      <div class="sub">0 open positions</div>
-    </div>
+      if (Math.abs(n) >= 1e3) {
+        return "$" + (n / 1e3).toFixed(0) + "K";
+      }
 
-    <div class="kpi">
-      <div class="label">Cumulative Net Yield</div>
-      <div class="value gold" id="yield">$0.00</div>
-      <div class="sub">Net of Penalties</div>
-    </div>
+      return "$" + n.toFixed(0);
+    }
 
-    <div class="kpi">
-      <div class="label">Payout Success</div>
-      <div class="value green-text" id="success">100%</div>
-      <div class="sub" id="shortfalls">0 shortfalls</div>
-    </div>
-  </section>
+    function App() {
+      const [tab, setTab] = useState("dashboard");
+      const [tab, setTab] = useState('dashboard');
+      const [kpis, setKpis] = useState(null);
+      const [reserves, setReserves] = useState(null);
+      const [decisions, setDecisions] = useState([]);
+@@ -101,91 +73,82 @@
+      const [backtestResults, setBacktestResults] = useState(null);
+      const [backtestLoading, setBacktestLoading] = useState(false);
+      const [stressReport, setStressReport] = useState(null);
+      const [selectedScenario, setSelectedScenario] = useState("OUTFLOW_MULT");
+      const [sweepAmount, setSweepAmount] = useState("10000000");
+      const [selectedScenario, setSelectedScenario] = useState('OUTFLOW_MULT');
+      const [sweepAmount, setSweepAmount] = useState('10000000');
+      const [sweepPreview, setSweepPreview] = useState(null);
+      const [chartHistory, setChartHistory] = useState([]);
+      const [apiError, setApiError] = useState("");
 
-  <section class="content">
-    <div class="panel">
-      <div class="panel-head">
-        <h2>Real-Time Liquidity Stack &amp; Safety Bounds</h2>
-        <span class="muted">Live Ledger Balance vs R_total</span>
-      </div>
-      <div class="chart-wrap">
-        <canvas id="liquidityChart"></canvas>
-      </div>
-      <div class="notice" id="status">
-        Simulation dashboard loaded.
-      </div>
-    </div>
+      const chartRef = useRef(null);
+      const chartInstance = useRef(null);
+      const historyRef = useRef([]);
+      const stepInFlight = useRef(false);
 
-    <div class="panel">
-      <div class="panel-head">
-        <h2>Live Decision Feed</h2>
-        <span class="count" id="eventCount">3 recorded</span>
-      </div>
+      async function fetchState(resetHistory = false) {
+        try {
+          const [kpiRes, reserveRes, decisionsRes, forecastRes] =
+            await Promise.all([
+              fetch(`${API_BASE}/api/v1/kpis?run_id=run_live_01`),
+              fetch(`${API_BASE}/api/v1/reserve?run_id=run_live_01`),
+              fetch(`${API_BASE}/api/v1/treasury/decisions?run_id=run_live_01&limit=20`),
+              fetch(`${API_BASE}/api/v1/forecast?run_id=run_live_01&horizon=24`)
+            ]);
 
-      <div class="feed" id="feed">
-        <div class="event">
-          <div class="event-top"><span>STEP #0</span><span>f12e6cc5e2d4de0...</span></div>
-          <strong>WITHDRAWAL PAID CASH</strong>
-          <small>IMMEDIATE_CASH_WATERFALL</small>
-        </div>
-
-        <div class="event">
-          <div class="event-top"><span>STEP #0</span><span>81630cb58484818...</span></div>
-          <strong>DEPOSIT</strong>
-          <small>HOURLY_DEPOSIT_FLOW</small>
-        </div>
-
-        <div class="event">
-          <div class="event-top"><span>STEP #0</span><span>5761ab0c41d4b24...</span></div>
-          <strong>OPENING BALANCE</strong>
-          <small>INITIAL_CAPITAL_ALLOCATION</small>
-        </div>
-      </div>
-    </div>
-  </section>
-</main>
-
-<footer>
-  <span>Reserve Juggler v1.3 · Mode: SIMULATION — no real funds moved</span>
-  <span>Single Source of Truth: Double-Entry Ledger (Integer Cents)</span>
-</footer>
-
-<script>
-const money = value =>
-  new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2
-  }).format(value);
-
-const initialCash = 2999807204.09;
-const reserveFloor = 73695219.50;
-
-const chart = new Chart(
-  document.getElementById("liquidityChart"),
-  {
-    type: "bar",
-    data: {
-      labels: ["-1", "0", "1"],
-      datasets: [
-        {
-          label: "Cash Buffer",
-          data: [3000, 3000, 3000],
-          backgroundColor: "#8d9aa7",
-          barPercentage: 0.72,
-          categoryPercentage: 0.72
-        },
-        {
-          label: "Repo Position",
-          data: [0, 0, 0],
-          backgroundColor: "#35b9ad"
-        },
-        {
-          label: "R_total (Target)",
-          type: "line",
-          data: [74, 74, 74],
-          borderColor: "#3394ff",
-          pointRadius: 2,
-          borderWidth: 2
-        },
-        {
-          label: "F_hard (Floor)",
-          type: "line",
-          data: [65, 65, 65],
-          borderColor: "#ff5968",
-          pointRadius: 2,
-          borderWidth: 2,
-          borderDash: [5, 3]
-        }
-      ]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: {
-        legend: {
-          position: "top",
-          labels: {
-            color: "#9aa9b9",
-            boxWidth: 10,
-            font: { size: 9 },
-            padding: 12
+          if (!kpiRes.ok) {
+            throw new Error(`KPI API returned ${kpiRes.status}`);
           }
-        },
-        tooltip: {
-          callbacks: {
-            label: context =>
-              `${context.dataset.label}: $${context.parsed.y.toFixed(2)}M`
+
+          const nextKpis = await kpiRes.json();
+          setKpis(nextKpis);
+
+          const [kpiRes, resRes, decRes, fcRes] = await Promise.all([
+            fetch(`${API_BASE}/api/v1/kpis?run_id=run_live_01`),
+            fetch(`${API_BASE}/api/v1/reserve?run_id=run_live_01`),
+            fetch(`${API_BASE}/api/v1/treasury/decisions?run_id=run_live_01&limit=20`),
+            fetch(`${API_BASE}/api/v1/forecast?run_id=run_live_01&horizon=24`)
+          ]);
+
+          let nextKpis = null;
+          let nextReserves = null;
+
+          if (reserveRes.ok) {
+            nextReserves = await reserveRes.json();
+          if (kpiRes.ok) {
+            nextKpis = await kpiRes.json();
+            setKpis(nextKpis);
           }
-        }
-      },
-      scales: {
-        x: {
-          grid: { color: "#1c2834" },
-          ticks: { color: "#8795a5", font: { size: 9 } }
-        },
-        y: {
-          min: 0,
-          max: 3000,
-          grid: { color: "#202c38" },
-          ticks: {
-            color: "#8795a5",
-            font: { size: 9 },
-            callback: value => "$" + value + "M"
+
+          if (resRes.ok) {
+            nextReserves = await resRes.json();
+            setReserves(nextReserves);
           }
+
+          if (decisionsRes.ok) {
+            const data = await decisionsRes.json();
+            setDecisions(Array.isArray(data) ? data : data.decisions || []);
+          if (decRes.ok) {
+            const data = await decRes.json();
+            setDecisions(Array.isArray(data) ? data : (data.decisions || []));
+          }
+
+          if (forecastRes.ok) {
+            setForecastData(await forecastRes.json());
+          if (fcRes.ok) {
+            setForecastData(await fcRes.json());
+          }
+
+          if (nextKpis) {
+          if (nextKpis && nextReserves) {
+            const snapshot = {
+              step: Number(nextKpis.step ?? nextKpis.step_index ?? 0),
+              cash: Number(nextKpis.cash_cents ?? 0) / 100,
+              repo: Number(nextKpis.repo_cents ?? 0) / 100,
+              reserve: Number(
+                nextReserves?.r_total_cents ??
+                nextReserves.r_total_cents ??
+                nextKpis.r_total_cents ??
+                0
+              ) / 100,
+              hardFloor: Number(
+                nextReserves?.f_hard_cents ??
+                nextReserves.f_hard_cents ??
+                nextKpis.f_hard_cents ??
+                0
+              ) / 100
+            };
+
+            const previous = historyRef.current;
+            let updated;
+            // Keep one snapshot per simulation step.
+            // Sort by step number so delayed responses cannot reorder the graph.
+            const previous = resetHistory ? [] : historyRef.current;
+            const snapshotsByStep = new Map(
+              previous.map(point => [Number(point.step), point])
+            );
+
+            if (resetHistory) {
+              updated = [snapshot];
+            } else {
+              updated = [...previous];
+              const last = updated[updated.length - 1];
+            snapshotsByStep.set(Number(snapshot.step), snapshot);
+
+              if (last && last.step === snapshot.step) {
+                updated[updated.length - 1] = snapshot;
+              } else {
+                updated.push(snapshot);
+              }
+            }
+            const updated = [...snapshotsByStep.values()]
+              .sort((a, b) => Number(a.step) - Number(b.step))
+              .slice(-24);
+
+            updated = updated.slice(-24);
+            historyRef.current = updated;
+            setChartHistory(updated);
+          }
+
+          setApiError("");
+        } catch (error) {
+          console.error("Failed to load application data:", error);
+          setApiError(error.message || "Unable to load application data.");
+          console.error('Error fetching state:', error);
         }
       }
+
+@@ -203,21 +166,25 @@
+      useEffect(() => {
+        if (!isRunning) return undefined;
+
+        const timer = setInterval(() => {
+        const interval = setInterval(() => {
+          handleStep();
+        }, 2000);
+
+        return () => clearInterval(timer);
+        return () => clearInterval(interval);
+      }, [isRunning]);
+
+      async function handleStep() {
+        if (stepInFlight.current) return;
+
+        stepInFlight.current = true;
+
+        try {
+          const response = await fetch(
+            `${API_BASE}/api/v1/sim/runs/run_live_01/step`,
+            {
+              method: "POST",
+              method: 'POST',
+              headers: {
+                "Idempotency-Key": "step_" + Date.now()
+                'Idempotency-Key': 'step_' + Date.now()
+              }
+            }
+          );
+@@ -228,8 +195,9 @@
+
+          await fetchState();
+        } catch (error) {
+          console.error("Simulation step failed:", error);
+          setApiError("Simulation step failed. Check the backend logs.");
+          console.error('Step error:', error);
+        } finally {
+          stepInFlight.current = false;
+        }
+      }
+
+@@ -239,7 +207,7 @@
+        try {
+          const response = await fetch(
+            `${API_BASE}/api/v1/sim/runs/run_live_01/reset`,
+            { method: "POST" }
+            { method: 'POST' }
+          );
+
+          if (!response.ok) {
+@@ -250,8 +218,7 @@
+          setChartHistory([]);
+          await fetchState(true);
+        } catch (error) {
+          console.error("Reset failed:", error);
+          setApiError("Reset failed. Check the backend logs.");
+          console.error('Reset error:', error);
+        }
+      }
+
+@@ -261,12 +228,11 @@
+            `${API_BASE}/api/v1/audit/verify?run_id=run_live_01`
+          );
+
+          if (!response.ok) throw new Error(await response.text());
+
+          setAuditStatus(await response.json());
+          if (response.ok) {
+            setAuditStatus(await response.json());
+          }
+        } catch (error) {
+          console.error(error);
+          setApiError("Audit verification failed.");
+        }
+      }
+
+@@ -275,27 +241,28 @@
+
+        try {
+          const response = await fetch(`${API_BASE}/api/v1/backtests`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              horizon_steps: 168,
+              strategies: [
+                "B0_CASH",
+                "B1_FIXED",
+                "B2_CONSERVATIVE",
+                "B3_DYNAMIC",
+                "B4_CHALLENGE"
+                'B0_CASH',
+                'B1_FIXED',
+                'B2_CONSERVATIVE',
+                'B3_DYNAMIC',
+                'B4_CHALLENGE'
+              ]
+            })
+          });
+
+          if (!response.ok) throw new Error(await response.text());
+
+          const data = await response.json();
+          setBacktestResults(data.results || data);
+          if (response.ok) {
+            const data = await response.json();
+            setBacktestResults(data.results || data);
+          } else {
+            console.error('Backtest failed:', await response.text());
+          }
+        } catch (error) {
+          console.error(error);
+          setApiError("Backtest failed. Check the backend logs.");
+        } finally {
+          setBacktestLoading(false);
+        }
+@@ -304,21 +271,22 @@
+      async function handleRunStress() {
+        try {
+          const response = await fetch(`${API_BASE}/api/v1/stress/events`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              scenario_id: selectedScenario,
+              start_step: kpis ? Number(kpis.step || 0) + 1 : 1,
+              duration_hours: 12
+            })
+          });
+
+          if (!response.ok) throw new Error(await response.text());
+
+          setStressReport(await response.json());
+          if (response.ok) {
+            setStressReport(await response.json());
+          } else {
+            console.error('Stress test failed:', await response.text());
+          }
+        } catch (error) {
+          console.error(error);
+          setApiError("Stress test failed. Check the backend logs.");
+        }
+      }
+
+@@ -327,28 +295,29 @@
+          const amount = Number(sweepAmount);
+
+          if (!Number.isFinite(amount) || amount <= 0) {
+            alert("Enter a valid sweep amount greater than zero.");
+            alert('Enter a valid sweep amount greater than zero.');
+            return;
+          }
+
+          const response = await fetch(
+            `${API_BASE}/api/v1/treasury/sweeps/preview`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                tier: 1,
+                amount_cents: String(Math.round(amount * 100))
+              })
+            }
+          );
+
+          if (!response.ok) throw new Error(await response.text());
+
+          setSweepPreview(await response.json());
+          if (response.ok) {
+            setSweepPreview(await response.json());
+          } else {
+            console.error('Preview failed:', await response.text());
+          }
+        } catch (error) {
+          console.error(error);
+          setApiError("Sweep preview failed. Check the backend logs.");
+        }
+      }
+
+@@ -357,17 +326,17 @@
+          const amount = Number(sweepAmount);
+
+          if (!Number.isFinite(amount) || amount <= 0) {
+            alert("Enter a valid sweep amount greater than zero.");
+            alert('Enter a valid sweep amount greater than zero.');
+            return;
+          }
+
+          const response = await fetch(
+            `${API_BASE}/api/v1/treasury/sweeps`,
+            {
+              method: "POST",
+              method: 'POST',
+              headers: {
+                "Content-Type": "application/json",
+                "Idempotency-Key": "manual_sweep_" + Date.now()
+                'Content-Type': 'application/json',
+                'Idempotency-Key': 'man_swp_' + Date.now()
+              },
+              body: JSON.stringify({
+                tier: 1,
+@@ -377,63 +346,63 @@
+            }
+          );
+
+          if (!response.ok) {
+            throw new Error(await response.text());
+          if (response.ok) {
+            alert('Sweep executed successfully!');
+            setSweepPreview(null);
+            await fetchState();
+          } else {
+            const error = await response.text();
+            alert('Sweep rejected: ' + error);
+          }
+
+          alert("Sweep executed successfully.");
+          setSweepPreview(null);
+          await fetchState();
+        } catch (error) {
+          console.error(error);
+          alert("Sweep failed: " + error.message);
+          alert('Error executing sweep: ' + error);
+        }
+      }
+
+      // Improved graph:
+      // Cash and repo are lines on the left axis.
+      // Reserve target and hard floor are lines on the right axis.
+      // The two axes prevent the $3B cash balance from flattening reserve lines.
+      // Chart: sorted history with separate scales for liquidity and reserves.
+      useEffect(() => {
+        if (!chartRef.current || chartHistory.length === 0) return;
+
+        if (!chartInstance.current) {
+          chartInstance.current = echarts.init(chartRef.current);
+        }
+
+        const history = chartHistory.slice(-24);
+        const history = [...chartHistory]
+          .sort((a, b) => Number(a.step) - Number(b.step))
+          .slice(-24);
+
+        const maxLiquidity = Math.max(
+          1,
+          ...history.map(point => point.cash),
+          ...history.map(point => point.repo)
+          ...history.map(point => point.cash || 0),
+          ...history.map(point => point.repo || 0)
+        ) * 1.1;
+
+        const maxReserve = Math.max(
+          1,
+          ...history.map(point => point.reserve),
+          ...history.map(point => point.hardFloor)
+          ...history.map(point => point.reserve || 0),
+          ...history.map(point => point.hardFloor || 0)
+        ) * 1.15;
+
+        const option = {
+          backgroundColor: "transparent",
+          animationDuration: 350,
+        chartInstance.current.setOption({
+          backgroundColor: 'transparent',
+          animationDuration: 300,
+
+          color: ["#8B98A5", "#3FB7A9", "#4EA1FF", "#FF6B6B"],
+          color: ['#8B98A5', '#3FB7A9', '#4EA1FF', '#FF6B6B'],
+
+          tooltip: {
+            trigger: "axis",
+            trigger: 'axis',
+            confine: true,
+            backgroundColor: "#121923",
+            borderColor: "#1E2A38",
+            textStyle: { color: "#E6EDF3" },
+            backgroundColor: '#121923',
+            borderColor: '#1E2A38',
+            textStyle: { color: '#E6EDF3' },
+            formatter: function(params) {
+              if (!params || params.length === 0) return "";
+              if (!params || params.length === 0) return '';
+
+              let result = `<strong>Simulation ${params[0].axisValue}</strong>`;
+
+              params.forEach(item => {
+                result += `<br/>${item.marker}${item.seriesName}: ${formatMillions(item.value)}`;
+                const value = Number(item.value || 0);
+                result += `<br/>${item.marker}${item.seriesName}: ${formatUSD(value * 100)}`;
+              });
+
+              return result;
+@@ -442,181 +411,179 @@
+
+          legend: {
+            top: 4,
+            left: "center",
+            itemGap: 16,
+            left: 'center',
+            itemGap: 14,
+            textStyle: {
+              color: "#B7C2CE",
+              color: '#B7C2CE',
+              fontSize: 11
+            }
+          },
+
+          grid: {
+            top: 68,
+            left: 72,
+            right: 78,
+            bottom: 48,
+            left: 78,
+            right: 82,
+            bottom: 54,
+            containLabel: false
+          },
+
+          xAxis: {
+            type: "category",
+            type: 'category',
+            data: history.map(point => `#${point.step}`),
+            boundaryGap: false,
+            axisLine: {
+              lineStyle: { color: "#344152" }
+              lineStyle: { color: '#344152' }
+            },
+            axisTick: { show: false },
+            axisLabel: {
+              color: "#A0ADBA",
+              color: '#A0ADBA',
+              margin: 12,
+              hideOverlap: true
+            },
+            name: "Simulation step",
+            nameLocation: "middle",
+            nameGap: 30,
+            name: 'Simulation step',
+            nameLocation: 'middle',
+            nameGap: 32,
+            nameTextStyle: {
+              color: "#8B98A5",
+              color: '#8B98A5',
+              fontSize: 11
+            }
+          },
+
+          yAxis: [
+            {
+              type: "value",
+              name: "Cash / Repo",
+              type: 'value',
+              name: 'Cash / Repo',
+              min: 0,
+              max: maxLiquidity,
+              position: "left",
+              position: 'left',
+              axisLine: {
+                show: true,
+                lineStyle: { color: "#536273" }
+                lineStyle: { color: '#536273' }
+              },
+              axisTick: { show: false },
+              axisLabel: {
+                color: "#A0ADBA",
+                formatter: value => formatMillions(value)
+                color: '#A0ADBA',
+                formatter: value => {
+                  if (Math.abs(value) >= 1e9) return '$' + (value / 1e9).toFixed(2) + 'B';
+                  if (Math.abs(value) >= 1e6) return '$' + (value / 1e6).toFixed(0) + 'M';
+                  if (Math.abs(value) >= 1e3) return '$' + (value / 1e3).toFixed(0) + 'K';
+                  return '$' + value.toFixed(0);
+                }
+              },
+              nameTextStyle: {
+                color: "#A0ADBA",
+                padding: [0, 0, 8, 0]
+                color: '#A0ADBA'
+              },
+              splitLine: {
+                lineStyle: {
+                  color: "#25303D",
+                  type: "solid"
+                  color: '#25303D'
+                }
+              }
+            },
+            {
+              type: "value",
+              name: "Reserve / Floor",
+              type: 'value',
+              name: 'Reserve / Floor',
+              min: 0,
+              max: maxReserve,
+              position: "right",
+              position: 'right',
+              axisLine: {
+                show: true,
+                lineStyle: { color: "#536273" }
+                lineStyle: { color: '#536273' }
+              },
+              axisTick: { show: false },
+              axisLabel: {
+                color: "#A0ADBA",
+                formatter: value => formatMillions(value)
+                color: '#A0ADBA',
+                formatter: value => {
+                  if (Math.abs(value) >= 1e9) return '$' + (value / 1e9).toFixed(2) + 'B';
+                  if (Math.abs(value) >= 1e6) return '$' + (value / 1e6).toFixed(1) + 'M';
+                  if (Math.abs(value) >= 1e3) return '$' + (value / 1e3).toFixed(0) + 'K';
+                  return '$' + value.toFixed(0);
+                }
+              },
+              nameTextStyle: {
+                color: "#A0ADBA",
+                padding: [0, 0, 8, 0]
+                color: '#A0ADBA'
+              },
+              splitLine: { show: false }
+            }
+          ],
+
+          series: [
+            {
+              name: "Cash Buffer",
+              type: "line",
+              name: 'Cash Buffer',
+              type: 'line',
+              yAxisIndex: 0,
+              data: history.map(point => point.cash),
+              showSymbol: true,
+              symbol: "circle",
+              symbol: 'circle',
+              symbolSize: 5,
+              smooth: false,
+              lineStyle: { width: 3 },
+              emphasis: { focus: "series" }
+              lineStyle: { width: 3 }
+            },
+            {
+              name: "Repo Position",
+              type: "line",
+              name: 'Repo Position',
+              type: 'line',
+              yAxisIndex: 0,
+              data: history.map(point => point.repo),
+              showSymbol: true,
+              symbol: "circle",
+              symbol: 'circle',
+              symbolSize: 5,
+              smooth: false,
+              lineStyle: { width: 2 },
+              emphasis: { focus: "series" }
+              lineStyle: { width: 2 }
+            },
+            {
+              name: "R_total (Target)",
+              type: "line",
+              name: 'R_total (Target)',
+              type: 'line',
+              yAxisIndex: 1,
+              data: history.map(point => point.reserve),
+              showSymbol: true,
+              symbol: "circle",
+              symbol: 'circle',
+              symbolSize: 7,
+              smooth: false,
+              lineStyle: { width: 3 },
+              emphasis: { focus: "series" }
+              lineStyle: { width: 3 }
+            },
+            {
+              name: "F_hard (Floor)",
+              type: "line",
+              name: 'F_hard (Floor)',
+              type: 'line',
+              yAxisIndex: 1,
+              data: history.map(point => point.hardFloor),
+              showSymbol: true,
+              symbol: "circle",
+              symbol: 'circle',
+              symbolSize: 6,
+              smooth: false,
+              lineStyle: {
+                width: 2,
+                type: "dashed"
+              },
+              emphasis: { focus: "series" }
+                type: 'dashed'
+              }
+            }
+          ]
+        };
+        }, true);
+
+        chartInstance.current.setOption(option, true);
+        chartInstance.current.resize();
+      }, [chartHistory, tab]);
+
+      useEffect(() => {
+        function resizeChart() {
+        const resizeChart = () => {
+          if (chartInstance.current) {
+            chartInstance.current.resize();
+          }
+        }
+        };
+
+        window.addEventListener("resize", resizeChart);
+        window.addEventListener('resize', resizeChart);
+
+        return () => {
+          window.removeEventListener("resize", resizeChart);
+          window.removeEventListener('resize', resizeChart);
+        };
+      }, []);
+
+      const tabs = [
+        "dashboard",
+        "forecast",
+        "sweep",
+        "backtest",
+        "stress",
+        "audit"
+        'dashboard',
+        'forecast',
+        'sweep',
+        'backtest',
+        'stress',
+        'audit'
+      ];
+
+      return (
+        <div className="flex flex-col min-h-screen">
+
+          <header className="border-b border-borderDark bg-panelDark px-6 py-4 flex flex-wrap items-center justify-between gap-4 sticky top-0 z-50">
+            <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center flex-wrap gap-3">
+              <span className="text-xl font-bold tracking-wider text-accentBlue">
+                ⚡ RESERVE JUGGLER
+              </span>
+@@ -626,7 +593,7 @@
+              </span>
+
+              <span className="bg-emerald-950 border border-emerald-800 text-emerald-300 text-xs px-2.5 py-1 rounded font-mono">
+                CYCLE #{kpis ? kpis.step : 0} (REPLAY)
+                CYCLE #{kpis ? (kpis.step ?? 0) : 0} (REPLAY)
+              </span>
+            </div>
+
+@@ -637,8 +604,8 @@
+                  onClick={() => setTab(name)}
+                  className={`px-3 py-1.5 rounded-md capitalize font-medium ${
+                    tab === name
+                      ? "bg-panelDark text-accentBlue border border-borderDark"
+                      : "text-textMuted hover:text-textLight"
+                      ? 'bg-panelDark text-accentBlue border border-borderDark'
+                      : 'text-textMuted hover:text-textLight'
+                  }`}
+                >
+                  {name}
+@@ -658,11 +625,11 @@
+                onClick={() => setIsRunning(value => !value)}
+                className={`px-3 py-1.5 rounded text-sm font-semibold ${
+                  isRunning
+                    ? "bg-amber-600 hover:bg-amber-700 text-white"
+                    : "bg-emerald-600 hover:bg-emerald-700 text-white"
+                    ? 'bg-amber-600 hover:bg-amber-700 text-white'
+                    : 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                }`}
+              >
+                {isRunning ? "⏸ Pause" : "▶ Auto-Play"}
+                {isRunning ? '⏸ Pause' : '▶ Auto-Play'}
+              </button>
+
+              <button
+@@ -674,434 +641,4 @@
+            </div>
+          </header>
+
+          <main className="flex-1 p-6 max-w-7xl mx-auto w-full space-y-6">
+
+            {apiError && (
+              <div className="bg-red-950 border border-red-800 text-red-300 p-3 rounded-lg text-sm">
+                {apiError}
+                <button
+                  onClick={() => setApiError("")}
+                  className="float-right font-bold px-2"
+                >
+                  ✕
+                </button>
+              </div>
+            )}
+
+            {/* KPI cards */}
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+
+              <div className="bg-panelDark border border-borderDark p-4 rounded-xl">
+                <div className="text-xs text-textMuted uppercase tracking-wide">Cash Buffer</div>
+                <div className="text-lg font-bold mono-num mt-1">
+                  {kpis ? formatUSD(kpis.cash_cents) : "..."}
+                </div>
+                <div className="text-xs text-emerald-400 mt-1">Immediate Liquidity</div>
+              </div>
+
+              <div className="bg-panelDark border border-borderDark p-4 rounded-xl">
+                <div className="text-xs text-textMuted uppercase tracking-wide">Reserve Floor</div>
+                <div className="text-lg font-bold text-accentBlue mono-num mt-1">
+                  {kpis ? formatUSD(kpis.r_total_cents) : "..."}
+                </div>
+                <div className="text-xs text-textMuted mt-1">Probabilistic + Hard Floor</div>
+              </div>
+
+              <div className="bg-panelDark border border-borderDark p-4 rounded-xl">
+                <div className="text-xs text-textMuted uppercase tracking-wide">Headroom</div>
+                <div className={`text-lg font-bold mono-num mt-1 ${
+                  kpis && Number(kpis.headroom_cents) < 0
+                    ? "text-red-400"
+                    : "text-emerald-400"
+                }`}>
+                  {kpis ? formatUSD(kpis.headroom_cents) : "..."}
+                </div>
+                <div className="text-xs text-textMuted mt-1">Cash minus R_total</div>
+              </div>
+
+              <div className="bg-panelDark border border-borderDark p-4 rounded-xl">
+                <div className="text-xs text-textMuted uppercase tracking-wide">Tier 1 Repo Vault</div>
+                <div className="text-lg font-bold text-tierRepo mono-num mt-1">
+                  {kpis ? formatUSD(kpis.repo_cents) : "..."}
+                </div>
+                <div className="text-xs text-textMuted mt-1">
+                  {kpis ? kpis.open_repos : 0} open positions
+                </div>
+              </div>
+
+              <div className="bg-panelDark border border-borderDark p-4 rounded-xl">
+                <div className="text-xs text-textMuted uppercase tracking-wide">Cumulative Net Yield</div>
+                <div className="text-lg font-bold text-amber-400 mono-num mt-1">
+                  {kpis ? formatUSD(kpis.cumulative_net_pnl_cents) : "..."}
+                </div>
+                <div className="text-xs text-textMuted mt-1">Net of Penalties</div>
+              </div>
+
+              <div className="bg-panelDark border border-borderDark p-4 rounded-xl">
+                <div className="text-xs text-textMuted uppercase tracking-wide">Payout Success</div>
+                <div className="text-lg font-bold text-emerald-400 mono-num mt-1">
+                  {kpis ? `${kpis.payout_success.success_rate_pct}%` : "100%"}
+                </div>
+                <div className="text-xs text-textMuted mt-1">
+                  {kpis ? kpis.payout_success.failed_events : 0} shortfalls
+                </div>
+              </div>
+
+            </div>
+
+            {/* Dashboard */}
+            {tab === "dashboard" && (
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+                <div className="lg:col-span-2 bg-panelDark border border-borderDark rounded-xl p-5 min-w-0">
+                  <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
+                    <h3 className="font-bold text-base">
+                      Liquidity & Safety Bounds
+                    </h3>
+                    <span className="text-xs text-textMuted">
+                      Cash / Repo on left · Reserves on right
+                    </span>
+                  </div>
+
+                  <div ref={chartRef} className="w-full" style={{ height: "360px" }}></div>
+
+                  <p className="text-xs text-textMuted mt-2">
+                    Last {chartHistory.length} recorded simulation steps. Click Step 1h to add a new point.
+                  </p>
+                </div>
+
+                <div className="bg-panelDark border border-borderDark rounded-xl p-5 min-w-0">
+                  <div className="flex items-center justify-between mb-3 border-b border-borderDark pb-2">
+                    <h3 className="font-bold">Live Decision Feed</h3>
+                    <span className="text-xs text-accentBlue">
+                      {decisions.length} recorded
+                    </span>
+                  </div>
+
+                  <div className="space-y-2.5 overflow-y-auto max-h-96 pr-1 text-xs font-mono">
+                    {decisions.map((d, index) => (
+                      <div
+                        key={d.seq ?? index}
+                        className="p-2.5 rounded bg-bgDark border border-borderDark"
+                      >
+                        <div className="flex justify-between gap-2 text-textMuted">
+                          <span className="font-bold text-accentBlue">
+                            STEP #{d.step_index}
+                          </span>
+                          <span className="truncate max-w-32">
+                            {d.record_hash}
+                          </span>
+                        </div>
+                        <div className="font-semibold mt-1">{d.action}</div>
+                        <div className="text-textMuted mt-1">{d.reason}</div>
+                      </div>
+                    ))}
+
+                    {decisions.length === 0 && (
+                      <div className="text-center text-textMuted py-8">
+                        No decisions recorded yet.
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+              </div>
+            )}
+
+            {/* Forecast */}
+            {tab === "forecast" && (
+              <div className="bg-panelDark border border-borderDark rounded-xl p-6 space-y-6">
+                <div className="border-b border-borderDark pb-4">
+                  <h2 className="text-lg font-bold">Forecast Engine & Quantile Fan</h2>
+                  <p className="text-xs text-textMuted">
+                    Forecast deposit inflows and withdrawal outflows.
+                  </p>
+                </div>
+
+                {forecastData ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-4">
+                      <h4 className="font-bold text-sm text-tierRepo uppercase">
+                        Deposit Inflow Quantiles
+                      </h4>
+                      <div className="space-y-2 text-xs font-mono">
+                        {(forecastData.deposits || []).map((d, i) => (
+                          <div key={d.horizon_h ?? i} className="p-3 bg-bgDark rounded border border-borderDark flex flex-wrap justify-between gap-2">
+                            <span className="text-accentBlue font-bold">+{d.horizon_h}h</span>
+                            <span>P50: {formatUSD(d.p50_cents)}</span>
+                            <span>P95: {formatUSD(d.p95_cents)}</span>
+                            <span className="text-emerald-400">P99: {formatUSD(d.p99_cents)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="space-y-4">
+                      <h4 className="font-bold text-sm text-tierOverdraft uppercase">
+                        Withdrawal Outflow Quantiles
+                      </h4>
+                      <div className="space-y-2 text-xs font-mono">
+                        {(forecastData.withdrawals || []).map((w, i) => (
+                          <div key={w.horizon_h ?? i} className="p-3 bg-bgDark rounded border border-borderDark flex flex-wrap justify-between gap-2">
+                            <span className="text-amber-400 font-bold">+{w.horizon_h}h</span>
+                            <span>P50: {formatUSD(w.p50_cents)}</span>
+                            <span>P95: {formatUSD(w.p95_cents)}</span>
+                            <span className="text-red-400">P99: {formatUSD(w.p99_cents)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-textMuted text-sm">Forecast data is loading or unavailable.</p>
+                )}
+              </div>
+            )}
+
+            {/* Sweep */}
+            {tab === "sweep" && (
+              <div className="max-w-2xl mx-auto bg-panelDark border border-borderDark rounded-xl p-6 space-y-6">
+                <div>
+                  <h2 className="text-lg font-bold">Manual Treasury Sweep Order</h2>
+                  <p className="text-xs text-textMuted">
+                    Preview safety checks before executing a sweep.
+                  </p>
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold text-textMuted uppercase">
+                    Sweep Amount (USD)
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={sweepAmount}
+                    onChange={e => setSweepAmount(e.target.value)}
+                    className="w-full bg-bgDark border border-borderDark rounded p-3 mt-1 text-base focus:border-accentBlue focus:outline-none"
+                  />
+                </div>
+
+                <div className="flex flex-wrap gap-3">
+                  <button
+                    onClick={handlePreviewSweep}
+                    className="flex-1 bg-panelDark hover:bg-borderDark border border-borderDark py-2.5 rounded font-semibold text-sm"
+                  >
+                    Preview Invariants
+                  </button>
+
+                  <button
+                    onClick={handleExecuteSweep}
+                    disabled={!sweepPreview || !sweepPreview.valid}
+                    className="flex-1 bg-emerald-700 hover:bg-emerald-600 py-2.5 rounded font-semibold text-sm"
+                  >
+                    Execute Sweep
+                  </button>
+                </div>
+
+                {sweepPreview && (
+                  <div className="p-4 bg-bgDark rounded-lg border border-borderDark space-y-2 text-xs font-mono">
+                    <div className="flex justify-between gap-2">
+                      <span className="text-textMuted">Sweep Status:</span>
+                      <span className={sweepPreview.valid ? "text-emerald-400" : "text-red-400"}>
+                        {sweepPreview.valid ? "VALID" : "REJECTED"}
+                      </span>
+                    </div>
+                    <div className="flex justify-between gap-2">
+                      <span className="text-textMuted">Available Surplus:</span>
+                      <span>{formatUSD(sweepPreview.sweepable_surplus_cents)}</span>
+                    </div>
+                    <div className="flex justify-between gap-2">
+                      <span className="text-textMuted">Headroom After Sweep:</span>
+                      <span>{formatUSD(sweepPreview.headroom_after_cents)}</span>
+                    </div>
+                    {sweepPreview.reason_codes?.length > 0 && (
+                      <div className="text-red-400 pt-2 border-t border-borderDark">
+                        Rejection Reasons: {sweepPreview.reason_codes.join(", ")}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Backtest */}
+            {tab === "backtest" && (
+              <div className="bg-panelDark border border-borderDark rounded-xl p-6 space-y-6">
+                <div className="flex flex-wrap justify-between items-center gap-3 border-b border-borderDark pb-4">
+                  <div>
+                    <h2 className="text-lg font-bold">Walk-Forward Strategy Comparison</h2>
+                    <p className="text-xs text-textMuted">
+                      168-hour replay comparing treasury strategies.
+                    </p>
+                  </div>
+                  <button
+                    onClick={handleRunBacktest}
+                    disabled={backtestLoading}
+                    className="bg-accentBlue hover:bg-blue-600 text-bgDark px-4 py-2 rounded font-bold text-sm"
+                  >
+                    {backtestLoading ? "Running Replay..." : "Run Backtest Replay"}
+                  </button>
+                </div>
+
+                {backtestResults && (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs font-mono">
+                      <thead className="bg-bgDark text-textMuted border-b border-borderDark">
+                        <tr>
+                          <th className="p-3">Strategy</th>
+                          <th className="p-3">Status</th>
+                          <th className="p-3">Payout Success</th>
+                          <th className="p-3">Gross Yield</th>
+                          <th className="p-3">Net Yield</th>
+                          <th className="p-3">Peak Overdraft</th>
+                          <th className="p-3">Avg Cash Buffer</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-borderDark">
+                        {(Array.isArray(backtestResults) ? backtestResults : []).map((r, i) => (
+                          <tr key={r.strategy_id ?? i}>
+                            <td className="p-3 font-bold text-accentBlue">{r.strategy_id}</td>
+                            <td className="p-3">{r.status}</td>
+                            <td className="p-3">{r.payout_success_steps_pct}%</td>
+                            <td className="p-3">{formatUSD(Number(r.gross_yield_usd || 0) * 100)}</td>
+                            <td className="p-3 text-amber-400">{formatUSD(Number(r.net_yield_usd || 0) * 100)}</td>
+                            <td className="p-3">{formatUSD(Number(r.overdraft_peak_usd || 0) * 100)}</td>
+                            <td className="p-3">{formatUSD(Number(r.avg_cash_usd || 0) * 100)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Stress */}
+            {tab === "stress" && (
+              <div className="bg-panelDark border border-borderDark rounded-xl p-6 space-y-6">
+                <div>
+                  <h2 className="text-lg font-bold">Stress Testing Scenario Injector</h2>
+                  <p className="text-xs text-textMuted">
+                    Test treasury resilience under adverse scenarios.
+                  </p>
+                </div>
+
+                <div className="flex flex-wrap gap-4 items-end max-w-xl">
+                  <div className="flex-1 min-w-56">
+                    <label className="text-xs text-textMuted font-bold uppercase">
+                      Select Scenario
+                    </label>
+                    <select
+                      value={selectedScenario}
+                      onChange={e => setSelectedScenario(e.target.value)}
+                      className="w-full bg-bgDark border border-borderDark rounded p-2.5 text-sm mt-1"
+                    >
+                      <option value="OUTFLOW_MULT">3x Outflow Multiplier</option>
+                      <option value="WITHDRAWAL_SPIKE">$150M Outflow Spike</option>
+                      <option value="DELAYED_DEPOSITS">Delayed Deposits</option>
+                      <option value="REPO_UNAVAILABLE">Repo Window Lockout</option>
+                      <option value="LIQUIDATION_DELAY">Settlement Lag</option>
+                      <option value="BOND_SHOCK">Bond Yield Shock</option>
+                      <option value="EQUITY_CRASH">Equity Crash</option>
+                      <option value="CORRELATED_RUN">Correlated Outflows + Market Shock</option>
+                      <option value="OVERDRAFT_RESTRICTED">Restricted Overdraft</option>
+                      <option value="COMBINED_WORST">Combined Worst Case</option>
+                    </select>
+                  </div>
+
+                  <button
+                    onClick={handleRunStress}
+                    className="bg-tierOverdraft hover:bg-red-600 text-white px-5 py-2.5 rounded font-bold text-sm"
+                  >
+                    Inject Stress
+                  </button>
+                </div>
+
+                {stressReport && (
+                  <div className="p-4 bg-bgDark rounded-xl border border-borderDark space-y-3 font-mono text-xs">
+                    <div className="text-sm font-bold text-accentBlue">
+                      STRESS REPORT: {stressReport.scenario_id}
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>Min Stressed Cash: {formatUSD(stressReport.min_cash_stressed_cents)}</div>
+                      <div>Peak Overdraft: {formatUSD(stressReport.overdraft_peak_stressed_cents)}</div>
+                      <div>Net P&amp;L Impact: {formatUSD(stressReport.net_pnl_delta_cents)}</div>
+                      <div>Payout Shortfalls: {stressReport.payout_failures_stressed}</div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Audit */}
+            {tab === "audit" && (
+              <div className="bg-panelDark border border-borderDark rounded-xl p-6 space-y-6">
+                <div className="flex flex-wrap justify-between items-center gap-3 border-b border-borderDark pb-4">
+                  <div>
+                    <h2 className="text-lg font-bold">Tamper-Evident SHA-256 Audit Trail</h2>
+                    <p className="text-xs text-textMuted">
+                      Verify the integrity of the recorded audit chain.
+                    </p>
+                  </div>
+                  <button
+                    onClick={handleVerifyAudit}
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded font-bold text-sm"
+                  >
+                    Verify Hash Chain
+                  </button>
+                </div>
+
+                {auditStatus && (
+                  <div className={`p-4 rounded-lg border font-mono text-xs ${
+                    auditStatus.valid
+                      ? "bg-emerald-950/50 border-emerald-800 text-emerald-300"
+                      : "bg-red-950/50 border-red-800 text-red-300"
+                  }`}>
+                    <div className="font-bold text-sm">
+                      {auditStatus.valid
+                        ? "AUDIT CHAIN VERIFIED"
+                        : "AUDIT CHAIN COMPROMISED"}
+                    </div>
+                    <div>Checked Records: {auditStatus.checked_records}</div>
+                  </div>
+                )}
+
+                <div className="space-y-2">
+                  <h4 className="text-xs uppercase text-textMuted font-bold">
+                    Recent Cryptographic Records
+                  </h4>
+                  <div className="space-y-2 font-mono text-xs">
+                    {decisions.slice(0, 8).map((d, i) => (
+                      <div key={d.seq ?? i} className="p-3 bg-bgDark rounded border border-borderDark flex flex-wrap justify-between gap-2">
+                        <div>
+                          <span className="font-bold text-accentBlue">Seq #{d.seq}</span>
+                          {" · "}
+                          <span>{d.action}</span>
+                        </div>
+                        <div className="text-textMuted break-all">
+                          Prev: {d.prev_hash} → Hash: {d.record_hash}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+          </main>
+
+          <footer className="border-t border-borderDark bg-panelDark px-6 py-3 text-xs text-textMuted flex flex-wrap justify-between gap-2">
+            <span className="font-mono">
+              Reserve Juggler v1.3 · SIMULATION — no real funds moved
+            </span>
+            <span>Double-Entry Ledger · Integer Cents</span>
+          </footer>
+
+        </div>
+      );
     }
-  }
-);
 
-let step = 0;
-let playing = false;
-let timer = null;
-
-function addEvent(title, detail) {
-  const feed = document.getElementById("feed");
-  const event = document.createElement("div");
-  event.className = "event";
-
-  const top = document.createElement("div");
-  top.className = "event-top";
-
-  const stepLabel = document.createElement("span");
-  stepLabel.textContent = `STEP #${step}`;
-
-  const idLabel = document.createElement("span");
-  idLabel.textContent = `local-sim-${String(step).padStart(4, "0")}`;
-
-  const heading = document.createElement("strong");
-  heading.textContent = title;
-
-  const description = document.createElement("small");
-  description.textContent = detail;
-
-  top.append(stepLabel, idLabel);
-  event.append(top, heading, description);
-  feed.prepend(event);
-
-  while (feed.children.length > 5) {
-    feed.lastElementChild.remove();
-  }
-
-  document.getElementById("eventCount").textContent =
-    `${feed.children.length} recorded`;
-}
-
-function updateStep() {
-  step++;
-
-  const cash = initialCash - step * 192800.12;
-  const headroom = cash - reserveFloor;
-
-  document.getElementById("cash").textContent = money(cash);
-  document.getElementById("floor").textContent = money(reserveFloor);
-  document.getElementById("headroom").textContent = money(headroom);
-
-  document.getElementById("status").textContent =
-    `Demo simulation step ${step}. These values are not live backend data.`;
-
-  chart.data.labels = [
-    String(step - 1),
-    String(step),
-    String(step + 1)
-  ];
-
-  chart.data.datasets[0].data = [
-    cash / 1000000,
-    cash / 1000000,
-    cash / 1000000
-  ];
-
-  chart.update();
-  addEvent("HOURLY SIMULATION STEP", "LOCAL_DEMO_STEP");
-}
-
-document.getElementById("stepBtn").addEventListener("click", updateStep);
-
-document.getElementById("playBtn").addEventListener("click", () => {
-  playing = !playing;
-
-  document.getElementById("playBtn").textContent =
-    playing ? "Ⅱ Pause" : "▶ Auto-Play";
-
-  if (playing) {
-    timer = setInterval(updateStep, 1800);
-  } else {
-    clearInterval(timer);
-    timer = null;
-  }
-});
-
-document.getElementById("resetBtn").addEventListener("click", () => {
-  if (timer) clearInterval(timer);
-
-  timer = null;
-  playing = false;
-  step = 0;
-
-  document.getElementById("playBtn").textContent = "▶ Auto-Play";
-  document.getElementById("cash").textContent = money(initialCash);
-  document.getElementById("floor").textContent = money(reserveFloor);
-  document.getElementById("headroom").textContent =
-    money(initialCash - reserveFloor);
-
-  document.getElementById("repo").textContent = "$0.00";
-  document.getElementById("yield").textContent = "$0.00";
-  document.getElementById("success").textContent = "100%";
-  document.getElementById("shortfalls").textContent = "0 shortfalls";
-
-  document.getElementById("status").textContent =
-    "Dashboard reset to initial demo values.";
-
-  chart.data.labels = ["-1", "0", "1"];
-  chart.data.datasets[0].data = [3000, 3000, 3000];
-  chart.update();
-
-  document.getElementById("feed").innerHTML = `
-    <div class="event">
-      <div class="event-top"><span>STEP #0</span><span>f12e6cc5e2d4de0...</span></div>
-      <strong>WITHDRAWAL PAID CASH</strong>
-      <small>IMMEDIATE_CASH_WATERFALL</small>
-    </div>
-    <div class="event">
-      <div class="event-top"><span>STEP #0</span><span>81630cb58484818...</span></div>
-      <strong>DEPOSIT</strong>
-      <small>HOURLY_DEPOSIT_FLOW</small>
-    </div>
-    <div class="event">
-      <div class="event-top"><span>STEP #0</span><span>5761ab0c41d4b24...</span></div>
-      <strong>OPENING BALANCE</strong>
-      <small>INITIAL_CAPITAL_ALLOCATION</small>
-    </div>`;
-
-  document.getElementById("eventCount").textContent = "3 recorded";
-});
-
-document.querySelectorAll("nav button").forEach(button => {
-  button.addEventListener("click", () => {
-    document.querySelectorAll("nav button").forEach(item =>
-      item.classList.remove("active")
-    );
-
-    button.classList.add("active");
-
-    document.getElementById("status").textContent =
-      button.dataset.tab === "Dashboard"
-        ? "Dashboard view selected."
-        : `${button.dataset.tab} view selected. This tab needs its backend integration.`;
-  });
-});
-</script>
+    ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+  </script>
 </body>
 </html>
+          <main className="flex-1 p-6 max-w-7
