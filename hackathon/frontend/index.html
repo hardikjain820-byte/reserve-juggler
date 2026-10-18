@@ -15,7 +15,7 @@
   <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
   <!-- Lucide Icons CDN -->
   <script src="https://unpkg.com/lucide@latest"></script>
-  
+
   <script>
     tailwind.config = {
       theme: {
@@ -70,24 +70,54 @@
       const [selectedScenario, setSelectedScenario] = useState('OUTFLOW_MULT');
       const [sweepAmount, setSweepAmount] = useState('10000000');
       const [sweepPreview, setSweepPreview] = useState(null);
+      const [chartHistory, setChartHistory] = useState([]);
 
       const chartRef = useRef(null);
       const chartInstance = useRef(null);
 
-      // Load initial state
-      const fetchState = async () => {
+      // Fetch current API state and save one historical snapshot for the chart.
+      // The chart history begins when this frontend version is loaded; older points
+      // cannot be reconstructed unless the backend stores historical snapshots.
+      const fetchState = async (resetHistory = false) => {
         try {
-          const kpiRes = await fetch(`${API_BASE}/api/v1/kpis?run_id=run_live_01`);
-          if (kpiRes.ok) setKpis(await kpiRes.json());
+          const [kpiRes, resRes, decRes, fcRes] = await Promise.all([
+            fetch(`${API_BASE}/api/v1/kpis?run_id=run_live_01`),
+            fetch(`${API_BASE}/api/v1/reserve?run_id=run_live_01`),
+            fetch(`${API_BASE}/api/v1/treasury/decisions?run_id=run_live_01&limit=20`),
+            fetch(`${API_BASE}/api/v1/forecast?run_id=run_live_01&horizon=24`)
+          ]);
 
-          const resRes = await fetch(`${API_BASE}/api/v1/reserve?run_id=run_live_01`);
-          if (resRes.ok) setReserves(await resRes.json());
-
-          const decRes = await fetch(`${API_BASE}/api/v1/treasury/decisions?run_id=run_live_01&limit=20`);
+          let nextKpis = null;
+          let nextReserves = null;
+          if (kpiRes.ok) {
+            nextKpis = await kpiRes.json();
+            setKpis(nextKpis);
+          }
+          if (resRes.ok) {
+            nextReserves = await resRes.json();
+            setReserves(nextReserves);
+          }
           if (decRes.ok) setDecisions(await decRes.json());
-
-          const fcRes = await fetch(`${API_BASE}/api/v1/forecast?run_id=run_live_01&horizon=24`);
           if (fcRes.ok) setForecastData(await fcRes.json());
+
+          if (nextKpis && nextReserves) {
+            const snapshot = {
+              step: Number(nextKpis.step ?? 0),
+              cash: Number(nextKpis.cash_cents ?? 0) / 100,
+              repo: Number(nextKpis.repo_cents ?? 0) / 100,
+              reserve: Number(nextReserves.r_total_cents ?? nextKpis.r_total_cents ?? 0) / 100,
+              hardFloor: Number(nextReserves.f_hard_cents ?? 0) / 100
+            };
+            setChartHistory(previous => {
+              if (resetHistory) return [snapshot];
+              const updated = [...previous];
+              const last = updated[updated.length - 1];
+              // Replace a duplicate step on ordinary refresh; append only new steps.
+              if (last && last.step === snapshot.step) updated[updated.length - 1] = snapshot;
+              else updated.push(snapshot);
+              return updated.slice(-24);
+            });
+          }
         } catch (err) {
           console.error("Error fetching state:", err);
         }
@@ -126,7 +156,7 @@
         setIsRunning(false);
         try {
           await fetch(`${API_BASE}/api/v1/sim/runs/run_live_01/reset`, { method: 'POST' });
-          await fetchState();
+          await fetchState(true);
         } catch (err) {
           console.error(err);
         }
@@ -215,65 +245,115 @@
         } catch (err) {
           alert("Error executing sweep: " + err);
         }
-      };
-
-      // Render ECharts Liquidity Chart
+      };      // Render the last 24 recorded snapshots. Cash uses the left axis; reserve
+      // targets use a separate right axis so their movement remains visible.
       useEffect(() => {
-        if (chartRef.current && kpis && reserves) {
-          if (!chartInstance.current) {
-            chartInstance.current = echarts.init(chartRef.current);
-          }
-          const option = {
-            backgroundColor: 'transparent',
-            tooltip: { trigger: 'axis' },
-            legend: { data: ['Cash Buffer', 'Repo Position', 'R_total (Target)', 'F_hard (Floor)'], textStyle: { color: '#8B98A5' } },
-            grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
-            xAxis: {
-              type: 'category',
-              data: [kpis.step - 2, kpis.step - 1, kpis.step],
-              axisLine: { lineStyle: { color: '#1E2A38' } },
-              axisLabel: { color: '#8B98A5' }
-            },
-            yAxis: {
+        if (!chartRef.current || chartHistory.length === 0) return;
+        if (!chartInstance.current) {
+          chartInstance.current = echarts.init(chartRef.current);
+        }
+
+        const history = chartHistory.slice(-24);
+        const reserveMax = Math.max(
+          1,
+          ...history.map(point => point.reserve || 0),
+          ...history.map(point => point.hardFloor || 0)
+        ) * 1.25;
+
+        const option = {
+          backgroundColor: 'transparent',
+          animationDuration: 250,
+          tooltip: { trigger: 'axis', confine: true },
+          legend: {
+            data: ['Cash Buffer', 'Repo Position', 'R_total (Target)', 'F_hard (Floor)'],
+            textStyle: { color: '#8B98A5' }
+          },
+          grid: { left: '4%', right: '8%', bottom: '8%', containLabel: true },
+          xAxis: {
+            type: 'category',
+            name: 'Simulation step',
+            data: history.map(point => `#${point.step}`),
+            axisLine: { lineStyle: { color: '#1E2A38' } },
+            axisLabel: { color: '#8B98A5' }
+          },
+          yAxis: [
+            {
               type: 'value',
+              name: 'Cash / Repo ($)',
               axisLine: { lineStyle: { color: '#1E2A38' } },
-              axisLabel: { color: '#8B98A5', formatter: (v) => '$' + (v / 1e6).toFixed(0) + 'M' },
+              axisLabel: { color: '#8B98A5', formatter: v => '$' + (v / 1e6).toFixed(0) + 'M' },
               splitLine: { lineStyle: { color: '#1E2A38' } }
             },
-            series: [
-              {
-                name: 'Cash Buffer',
-                type: 'bar',
-                stack: 'total',
-                color: '#8B98A5',
-                data: [Number(kpis.cash_cents) / 100, Number(kpis.cash_cents) / 100, Number(kpis.cash_cents) / 100]
-              },
-              {
-                name: 'Repo Position',
-                type: 'bar',
-                stack: 'total',
-                color: '#3FB7A9',
-                data: [Number(kpis.repo_cents) / 100, Number(kpis.repo_cents) / 100, Number(kpis.repo_cents) / 100]
-              },
-              {
-                name: 'R_total (Target)',
-                type: 'line',
-                color: '#4EA1FF',
-                lineStyle: { width: 3 },
-                data: [Number(reserves.r_total_cents) / 100, Number(reserves.r_total_cents) / 100, Number(reserves.r_total_cents) / 100]
-              },
-              {
-                name: 'F_hard (Floor)',
-                type: 'line',
-                color: '#FF6B6B',
-                lineStyle: { type: 'dashed', width: 2 },
-                data: [Number(reserves.f_hard_cents) / 100, Number(reserves.f_hard_cents) / 100, Number(reserves.f_hard_cents) / 100]
-              }
-            ]
-          };
-          chartInstance.current.setOption(option);
-        }
-      }, [kpis, reserves, tab]);
+            {
+              type: 'value',
+              name: 'Reserve ($)',
+              min: 0,
+              max: reserveMax,
+              axisLine: { lineStyle: { color: '#1E2A38' } },
+              axisLabel: { color: '#8B98A5', formatter: v => '$' + (v / 1e6).toFixed(0) + 'M' },
+              splitLine: { show: false }
+            }
+          ],
+          series: [
+            {
+              name: 'Cash Buffer',
+              type: 'bar',
+              stack: 'liquidity',
+              yAxisIndex: 0,
+              color: '#8B98A5',
+              data: history.map(point => point.cash)
+            },
+            {
+              name: 'Repo Position',
+              type: 'bar',
+              stack: 'liquidity',
+              yAxisIndex: 0,
+              color: '#3FB7A9',
+              data: history.map(point => point.repo)
+            },
+            {
+              name: 'R_total (Target)',
+              type: 'line',
+              yAxisIndex: 1,
+              color: '#4EA1FF',
+              showSymbol: true,
+              symbolSize: 6,
+              lineStyle: { width: 3 },
+              data: history.map(point => point.reserve)
+            },
+            {
+              name: 'F_hard (Floor)',
+              type: 'line',
+              yAxisIndex: 1,
+              color: '#FF6B6B',
+              showSymbol: true,
+              symbolSize: 5,
+              lineStyle: { type: 'dashed', width: 2 },
+              data: history.map(point => point.hardFloor)
+            }
+          ]
+        };
+        chartInstance.current.setOption(option, true);
+      }, [chartHistory, tab]);
+
+      // Keep the chart correctly sized when the browser window changes size.
+      useEffect(() => {
+        const resizeChart = () => {
+          if (chartInstance.current) chartInstance.current.resize();
+        };
+        window.addEventListener('resize', resizeChart);
+        return () => window.removeEventListener('resize', resizeChart);
+      }, []);
+
+      // Dispose the chart instance when the component unmounts.
+      useEffect(() => {
+        return () => {
+          if (chartInstance.current) {
+            chartInstance.current.dispose();
+            chartInstance.current = null;
+          }
+        };
+      }, []);
 
       return (
         <div className="flex flex-col min-h-screen">
@@ -356,7 +436,7 @@
                   {kpis ? formatUSD(kpis.headroom_cents) : "..."}
                 </div>
                 <div className="text-xs text-textMuted mt-1">Cash minus R_total</div>
-              </div>
+              </div>              </div>
 
               <div className="bg-panelDark border border-borderDark p-4 rounded-xl">
                 <div className="text-xs text-textMuted font-medium uppercase tracking-wide">Tier 1 Repo Vault</div>
@@ -535,8 +615,7 @@
             )}
 
             {/* TAB: BACKTESTING (B0-B4) */}
-            {tab === 'backtest' && (
-              <div className="bg-panelDark border border-borderDark rounded-xl p-6 space-y-6">
+            {tab === 'backtest' && (              <div className="bg-panelDark border border-borderDark rounded-xl p-6 space-y-6">
                 <div className="flex justify-between items-center border-b border-borderDark pb-4">
                   <div>
                     <h2 className="text-lg font-bold text-textLight">Walk-Forward Strategy Comparison (B0–B4)</h2>
