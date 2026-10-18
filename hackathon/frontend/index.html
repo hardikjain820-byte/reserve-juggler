@@ -4,17 +4,11 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Reserve Juggler — Institutional Treasury Engine</title>
-  <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
-  <!-- React 18 & ReactDOM CDN -->
   <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
-  <!-- Babel Standalone for JSX compilation in browser -->
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-  <!-- Apache ECharts CDN -->
   <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
-  <!-- Lucide Icons CDN -->
-  <script src="https://unpkg.com/lucide@latest"></script>
 
   <script>
     tailwind.config = {
@@ -31,29 +25,41 @@
             tierRepo: '#3FB7A9',
             tierBond: '#E0B341',
             tierStock: '#C77DFF',
-            tierOverdraft: '#FF6B6B',
+            tierOverdraft: '#FF6B6B'
           }
         }
       }
-    }
+    };
   </script>
+
   <style>
-    body { background-color: #0B0F14; color: #E6EDF3; font-family: ui-sans-serif, system-ui, -apple-system, sans-serif; }
-    .mono-num { font-variant-numeric: tabular-nums; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
+    body {
+      background-color: #0B0F14;
+      color: #E6EDF3;
+      font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
+    }
+
+    .mono-num {
+      font-variant-numeric: tabular-nums;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
   </style>
 </head>
+
 <body class="bg-bgDark min-h-screen text-textLight">
   <div id="root"></div>
 
   <script type="text/babel">
     const { useState, useEffect, useRef } = React;
-
     const API_BASE = window.location.origin;
 
     function formatUSD(cents) {
       if (cents === undefined || cents === null) return "$0.00";
-      const num = Number(cents) / 100.0;
-      return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(num);
+
+      return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'USD'
+      }).format(Number(cents) / 100);
     }
 
     function App() {
@@ -75,10 +81,7 @@
       const chartRef = useRef(null);
       const chartInstance = useRef(null);
 
-      // Fetch current API state and save one historical snapshot for the chart.
-      // The chart history begins when this frontend version is loaded; older points
-      // cannot be reconstructed unless the backend stores historical snapshots.
-      const fetchState = async (resetHistory = false) => {
+      async function fetchState(resetHistory = false) {
         try {
           const [kpiRes, resRes, decRes, fcRes] = await Promise.all([
             fetch(`${API_BASE}/api/v1/kpis?run_id=run_live_01`),
@@ -89,113 +92,161 @@
 
           let nextKpis = null;
           let nextReserves = null;
+
           if (kpiRes.ok) {
             nextKpis = await kpiRes.json();
             setKpis(nextKpis);
           }
+
           if (resRes.ok) {
             nextReserves = await resRes.json();
             setReserves(nextReserves);
           }
-          if (decRes.ok) setDecisions(await decRes.json());
-          if (fcRes.ok) setForecastData(await fcRes.json());
+
+          if (decRes.ok) {
+            setDecisions(await decRes.json());
+          }
+
+          if (fcRes.ok) {
+            setForecastData(await fcRes.json());
+          }
 
           if (nextKpis && nextReserves) {
             const snapshot = {
               step: Number(nextKpis.step ?? 0),
               cash: Number(nextKpis.cash_cents ?? 0) / 100,
               repo: Number(nextKpis.repo_cents ?? 0) / 100,
-              reserve: Number(nextReserves.r_total_cents ?? nextKpis.r_total_cents ?? 0) / 100,
+              reserve: Number(
+                nextReserves.r_total_cents ??
+                nextKpis.r_total_cents ?? 0
+              ) / 100,
               hardFloor: Number(nextReserves.f_hard_cents ?? 0) / 100
             };
+
             setChartHistory(previous => {
               if (resetHistory) return [snapshot];
+
               const updated = [...previous];
               const last = updated[updated.length - 1];
-              // Replace a duplicate step on ordinary refresh; append only new steps.
-              if (last && last.step === snapshot.step) updated[updated.length - 1] = snapshot;
-              else updated.push(snapshot);
+
+              if (last && last.step === snapshot.step) {
+                updated[updated.length - 1] = snapshot;
+              } else {
+                updated.push(snapshot);
+              }
+
               return updated.slice(-24);
             });
           }
-        } catch (err) {
-          console.error("Error fetching state:", err);
+        } catch (error) {
+          console.error('Error fetching state:', error);
         }
-      };
+      }
 
       useEffect(() => {
         fetchState();
       }, []);
 
-      // Auto-step timer
       useEffect(() => {
-        let interval = null;
-        if (isRunning) {
-          interval = setInterval(async () => {
-            await handleStep();
-          }, 1500);
-        }
+        if (!isRunning) return;
+
+        const interval = setInterval(() => {
+          handleStep();
+        }, 1500);
+
         return () => clearInterval(interval);
       }, [isRunning]);
 
-      const handleStep = async () => {
+      async function handleStep() {
         try {
-          const res = await fetch(`${API_BASE}/api/v1/sim/runs/run_live_01/step`, {
-            method: 'POST',
-            headers: { 'Idempotency-Key': 'step_' + Date.now() }
-          });
-          if (res.ok) {
+          const response = await fetch(
+            `${API_BASE}/api/v1/sim/runs/run_live_01/step`,
+            {
+              method: 'POST',
+              headers: {
+                'Idempotency-Key': 'step_' + Date.now()
+              }
+            }
+          );
+
+          if (response.ok) {
             await fetchState();
+          } else {
+            console.error('Step request failed:', await response.text());
           }
-        } catch (err) {
-          console.error(err);
+        } catch (error) {
+          console.error('Step error:', error);
         }
-      };
+      }
 
-      const handleReset = async () => {
+      async function handleReset() {
         setIsRunning(false);
-        try {
-          await fetch(`${API_BASE}/api/v1/sim/runs/run_live_01/reset`, { method: 'POST' });
-          await fetchState(true);
-        } catch (err) {
-          console.error(err);
-        }
-      };
 
-      const handleVerifyAudit = async () => {
         try {
-          const res = await fetch(`${API_BASE}/api/v1/audit/verify?run_id=run_live_01`);
-          if (res.ok) setAuditStatus(await res.json());
-        } catch (err) {
-          console.error(err);
-        }
-      };
+          const response = await fetch(
+            `${API_BASE}/api/v1/sim/runs/run_live_01/reset`,
+            { method: 'POST' }
+          );
 
-      const handleRunBacktest = async () => {
+          if (response.ok) {
+            await fetchState(true);
+          } else {
+            console.error('Reset request failed:', await response.text());
+          }
+        } catch (error) {
+          console.error('Reset error:', error);
+        }
+      }
+
+      async function handleVerifyAudit() {
+        try {
+          const response = await fetch(
+            `${API_BASE}/api/v1/audit/verify?run_id=run_live_01`
+          );
+
+          if (response.ok) {
+            setAuditStatus(await response.json());
+          }
+        } catch (error) {
+          console.error(error);
+        }
+      }
+
+      async function handleRunBacktest() {
         setBacktestLoading(true);
+
         try {
-          const res = await fetch(`${API_BASE}/api/v1/backtests`, {
+          const response = await fetch(`${API_BASE}/api/v1/backtests`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               horizon_steps: 168,
-              strategies: ["B0_CASH", "B1_FIXED", "B2_CONSERVATIVE", "B3_DYNAMIC", "B4_CHALLENGE"]
+              strategies: [
+                'B0_CASH',
+                'B1_FIXED',
+                'B2_CONSERVATIVE',
+                'B3_DYNAMIC',
+                'B4_CHALLENGE'
+              ]
             })
           });
-          if (res.ok) {
-            const data = await res.json();
+
+          if (response.ok) {
+            const data = await response.json();
             setBacktestResults(data.results);
+          } else {
+            console.error('Backtest failed:', await response.text());
           }
-        } catch (err) {
-          console.error(err);
+        } catch (error) {
+          console.error(error);
         } finally {
           setBacktestLoading(false);
         }
-      };
+      }
 
-      const handleRunStress = async () => {
+      async function handleRunStress() {
         try {
-          const res = await fetch(`${API_BASE}/api/v1/stress/events`, {
+          const response = await fetch(`${API_BASE}/api/v1/stress/events`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -204,71 +255,118 @@
               duration_hours: 12
             })
           });
-          if (res.ok) {
-            setStressReport(await res.json());
+
+          if (response.ok) {
+            setStressReport(await response.json());
+          } else {
+            console.error('Stress test failed:', await response.text());
           }
-        } catch (err) {
-          console.error(err);
+        } catch (error) {
+          console.error(error);
         }
-      };
+      }
 
-      const handlePreviewSweep = async () => {
+      async function handlePreviewSweep() {
         try {
           const cents = (parseFloat(sweepAmount) * 100).toString();
-          const res = await fetch(`${API_BASE}/api/v1/treasury/sweeps/preview`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ tier: 1, amount_cents: cents })
-          });
-          if (res.ok) setSweepPreview(await res.json());
-        } catch (err) {
-          console.error(err);
-        }
-      };
 
-      const handleExecuteSweep = async () => {
+          const response = await fetch(
+            `${API_BASE}/api/v1/treasury/sweeps/preview`,
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                tier: 1,
+                amount_cents: cents
+              })
+            }
+          );
+
+          if (response.ok) {
+            setSweepPreview(await response.json());
+          } else {
+            console.error('Preview failed:', await response.text());
+          }
+        } catch (error) {
+          console.error(error);
+        }
+      }
+
+      async function handleExecuteSweep() {
         try {
           const cents = (parseFloat(sweepAmount) * 100).toString();
-          const res = await fetch(`${API_BASE}/api/v1/treasury/sweeps`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Idempotency-Key': 'man_swp_' + Date.now() },
-            body: JSON.stringify({ tier: 1, amount_cents: cents, confirm: true })
-          });
-          if (res.ok) {
-            alert("Sweep executed successfully!");
+
+          const response = await fetch(
+            `${API_BASE}/api/v1/treasury/sweeps`,
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Idempotency-Key': 'man_swp_' + Date.now()
+              },
+              body: JSON.stringify({
+                tier: 1,
+                amount_cents: cents,
+                confirm: true
+              })
+            }
+          );
+
+          if (response.ok) {
+            alert('Sweep executed successfully!');
             setSweepPreview(null);
             await fetchState();
           } else {
-            const err = await res.json();
-            alert("Sweep rejected: " + JSON.stringify(err.detail));
+            const error = await response.json();
+            alert('Sweep rejected: ' + JSON.stringify(error.detail));
           }
-        } catch (err) {
-          alert("Error executing sweep: " + err);
+        } catch (error) {
+          alert('Error executing sweep: ' + error);
         }
-      };      // Render the last 24 recorded snapshots. Cash uses the left axis; reserve
-      // targets use a separate right axis so their movement remains visible.
+      }
+
+      // Chart: historical snapshots, with separate axes for cash and reserves.
       useEffect(() => {
         if (!chartRef.current || chartHistory.length === 0) return;
+
         if (!chartInstance.current) {
           chartInstance.current = echarts.init(chartRef.current);
         }
 
         const history = chartHistory.slice(-24);
+
         const reserveMax = Math.max(
           1,
           ...history.map(point => point.reserve || 0),
           ...history.map(point => point.hardFloor || 0)
         ) * 1.25;
 
-        const option = {
+        chartInstance.current.setOption({
           backgroundColor: 'transparent',
           animationDuration: 250,
-          tooltip: { trigger: 'axis', confine: true },
+
+          tooltip: {
+            trigger: 'axis',
+            confine: true
+          },
+
           legend: {
-            data: ['Cash Buffer', 'Repo Position', 'R_total (Target)', 'F_hard (Floor)'],
+            data: [
+              'Cash Buffer',
+              'Repo Position',
+              'R_total (Target)',
+              'F_hard (Floor)'
+            ],
             textStyle: { color: '#8B98A5' }
           },
-          grid: { left: '4%', right: '8%', bottom: '8%', containLabel: true },
+
+          grid: {
+            left: '4%',
+            right: '8%',
+            bottom: '8%',
+            containLabel: true
+          },
+
           xAxis: {
             type: 'category',
             name: 'Simulation step',
@@ -276,24 +374,34 @@
             axisLine: { lineStyle: { color: '#1E2A38' } },
             axisLabel: { color: '#8B98A5' }
           },
+
           yAxis: [
             {
               type: 'value',
               name: 'Cash / Repo ($)',
-              axisLine: { lineStyle: { color: '#1E2A38' } },
-              axisLabel: { color: '#8B98A5', formatter: v => '$' + (v / 1e6).toFixed(0) + 'M' },
-              splitLine: { lineStyle: { color: '#1E2A38' } }
+              axisLabel: {
+                color: '#8B98A5',
+                formatter: value =>
+                  '$' + (value / 1e6).toFixed(0) + 'M'
+              },
+              splitLine: {
+                lineStyle: { color: '#1E2A38' }
+              }
             },
             {
               type: 'value',
               name: 'Reserve ($)',
               min: 0,
               max: reserveMax,
-              axisLine: { lineStyle: { color: '#1E2A38' } },
-              axisLabel: { color: '#8B98A5', formatter: v => '$' + (v / 1e6).toFixed(0) + 'M' },
+              axisLabel: {
+                color: '#8B98A5',
+                formatter: value =>
+                  '$' + (value / 1e6).toFixed(0) + 'M'
+              },
               splitLine: { show: false }
             }
           ],
+
           series: [
             {
               name: 'Cash Buffer',
@@ -332,20 +440,23 @@
               data: history.map(point => point.hardFloor)
             }
           ]
-        };
-        chartInstance.current.setOption(option, true);
+        }, true);
       }, [chartHistory, tab]);
 
-      // Keep the chart correctly sized when the browser window changes size.
       useEffect(() => {
         const resizeChart = () => {
-          if (chartInstance.current) chartInstance.current.resize();
+          if (chartInstance.current) {
+            chartInstance.current.resize();
+          }
         };
+
         window.addEventListener('resize', resizeChart);
-        return () => window.removeEventListener('resize', resizeChart);
+
+        return () => {
+          window.removeEventListener('resize', resizeChart);
+        };
       }, []);
 
-      // Dispose the chart instance when the component unmounts.
       useEffect(() => {
         return () => {
           if (chartInstance.current) {
@@ -357,50 +468,57 @@
 
       return (
         <div className="flex flex-col min-h-screen">
-          {/* Header */}
-          <header className="border-b border-borderDark bg-panelDark px-6 py-4 flex items-center justify-between sticky top-0 z-50">
-            <div className="flex items-center space-x-4">
-              <span className="text-xl font-bold tracking-wider text-accentBlue flex items-center gap-2">
+
+          <header className="border-b border-borderDark bg-panelDark px-6 py-4 flex flex-wrap items-center justify-between gap-4 sticky top-0 z-50">
+            <div className="flex items-center flex-wrap gap-3">
+              <span className="text-xl font-bold tracking-wider text-accentBlue">
                 ⚡ RESERVE JUGGLER
               </span>
-              <span className="bg-blue-950 border border-blue-800 text-blue-300 text-xs px-2.5 py-1 rounded font-mono font-semibold">
+
+              <span className="bg-blue-950 border border-blue-800 text-blue-300 text-xs px-2.5 py-1 rounded font-mono">
                 SIMULATION-ONLY
               </span>
+
               <span className="bg-emerald-950 border border-emerald-800 text-emerald-300 text-xs px-2.5 py-1 rounded font-mono">
                 CYCLE #{kpis ? kpis.step : 0} (REPLAY)
               </span>
             </div>
 
-            <nav className="flex space-x-1 bg-bgDark p-1 rounded-lg border border-borderDark text-sm">
-              {['dashboard', 'forecast', 'sweep', 'backtest', 'stress', 'audit'].map((t) => (
+            <nav className="flex flex-wrap gap-1 bg-bgDark p-1 rounded-lg border border-borderDark text-sm">
+              {['dashboard', 'forecast', 'sweep', 'backtest', 'stress', 'audit'].map(name => (
                 <button
-                  key={t}
-                  onClick={() => setTab(t)}
-                  className={`px-3 py-1.5 rounded-md capitalize font-medium transition ${
-                    tab === t ? 'bg-panelDark text-accentBlue border border-borderDark shadow' : 'text-textMuted hover:text-textLight'
+                  key={name}
+                  onClick={() => setTab(name)}
+                  className={`px-3 py-1.5 rounded-md capitalize font-medium ${
+                    tab === name
+                      ? 'bg-panelDark text-accentBlue border border-borderDark'
+                      : 'text-textMuted hover:text-textLight'
                   }`}
                 >
-                  {t}
+                  {name}
                 </button>
               ))}
             </nav>
 
-            {/* Simulation Controls */}
-            <div className="flex items-center space-x-2">
+            <div className="flex flex-wrap items-center gap-2">
               <button
                 onClick={handleStep}
-                className="bg-panelDark hover:bg-borderDark border border-borderDark px-3 py-1.5 rounded text-sm font-semibold flex items-center gap-1 text-textLight"
+                className="bg-panelDark hover:bg-borderDark border border-borderDark px-3 py-1.5 rounded text-sm font-semibold"
               >
                 ▶ Step 1h
               </button>
+
               <button
-                onClick={() => setIsRunning(!isRunning)}
+                onClick={() => setIsRunning(value => !value)}
                 className={`px-3 py-1.5 rounded text-sm font-semibold ${
-                  isRunning ? 'bg-amber-600 hover:bg-amber-700 text-white' : 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                  isRunning
+                    ? 'bg-amber-600 hover:bg-amber-700 text-white'
+                    : 'bg-emerald-600 hover:bg-emerald-700 text-white'
                 }`}
               >
                 {isRunning ? '⏸ Pause' : '▶ Auto-Play'}
               </button>
+
               <button
                 onClick={handleReset}
                 className="bg-red-950 hover:bg-red-900 border border-red-800 text-red-300 px-3 py-1.5 rounded text-sm font-semibold"
@@ -410,118 +528,142 @@
             </div>
           </header>
 
-          {/* Main Content Area */}
           <main className="flex-1 p-6 max-w-7xl mx-auto w-full space-y-6">
-            {/* KPI Cards Row */}
-            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+
+            {/* KPI cards */}
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+
               <div className="bg-panelDark border border-borderDark p-4 rounded-xl">
-                <div className="text-xs text-textMuted font-medium uppercase tracking-wide">Cash Buffer</div>
-                <div className="text-lg font-bold text-textLight mono-num mt-1">
-                  {kpis ? formatUSD(kpis.cash_cents) : "..."}
+                <div className="text-xs text-textMuted uppercase tracking-wide">Cash Buffer</div>
+                <div className="text-lg font-bold mono-num mt-1">
+                  {kpis ? formatUSD(kpis.cash_cents) : '...'}
                 </div>
-                <div className="text-xs text-emerald-400 mt-1">● Immediate Liquidity</div>
+                <div className="text-xs text-emerald-400 mt-1">Immediate Liquidity</div>
               </div>
 
               <div className="bg-panelDark border border-borderDark p-4 rounded-xl">
-                <div className="text-xs text-textMuted font-medium uppercase tracking-wide">Reserve Floor (R_total)</div>
+                <div className="text-xs text-textMuted uppercase tracking-wide">Reserve Floor</div>
                 <div className="text-lg font-bold text-accentBlue mono-num mt-1">
-                  {kpis ? formatUSD(kpis.r_total_cents) : "..."}
+                  {kpis ? formatUSD(kpis.r_total_cents) : '...'}
                 </div>
                 <div className="text-xs text-textMuted mt-1">Probabilistic + Hard Floor</div>
               </div>
 
               <div className="bg-panelDark border border-borderDark p-4 rounded-xl">
-                <div className="text-xs text-textMuted font-medium uppercase tracking-wide">Headroom</div>
-                <div className={`text-lg font-bold mono-num mt-1 ${kpis && Number(kpis.headroom_cents) < 0 ? 'text-red-400' : 'text-emerald-400'}`}>
-                  {kpis ? formatUSD(kpis.headroom_cents) : "..."}
+                <div className="text-xs text-textMuted uppercase tracking-wide">Headroom</div>
+                <div className={`text-lg font-bold mono-num mt-1 ${
+                  kpis && Number(kpis.headroom_cents) < 0
+                    ? 'text-red-400'
+                    : 'text-emerald-400'
+                }`}>
+                  {kpis ? formatUSD(kpis.headroom_cents) : '...'}
                 </div>
                 <div className="text-xs text-textMuted mt-1">Cash minus R_total</div>
-              </div>              </div>
+              </div>
 
               <div className="bg-panelDark border border-borderDark p-4 rounded-xl">
-                <div className="text-xs text-textMuted font-medium uppercase tracking-wide">Tier 1 Repo Vault</div>
+                <div className="text-xs text-textMuted uppercase tracking-wide">Tier 1 Repo Vault</div>
                 <div className="text-lg font-bold text-tierRepo mono-num mt-1">
-                  {kpis ? formatUSD(kpis.repo_cents) : "..."}
+                  {kpis ? formatUSD(kpis.repo_cents) : '...'}
                 </div>
-                <div className="text-xs text-textMuted mt-1">{kpis ? kpis.open_repos : 0} open positions</div>
+                <div className="text-xs text-textMuted mt-1">
+                  {kpis ? kpis.open_repos : 0} open positions
+                </div>
               </div>
 
               <div className="bg-panelDark border border-borderDark p-4 rounded-xl">
-                <div className="text-xs text-textMuted font-medium uppercase tracking-wide">Cumulative Net Yield</div>
+                <div className="text-xs text-textMuted uppercase tracking-wide">Cumulative Net Yield</div>
                 <div className="text-lg font-bold text-amber-400 mono-num mt-1">
-                  {kpis ? formatUSD(kpis.cumulative_net_pnl_cents) : "..."}
+                  {kpis ? formatUSD(kpis.cumulative_net_pnl_cents) : '...'}
                 </div>
-                <div className="text-xs text-emerald-400 mt-1">Net of Penalties</div>
+                <div className="text-xs text-textMuted mt-1">Net of Penalties</div>
               </div>
 
               <div className="bg-panelDark border border-borderDark p-4 rounded-xl">
-                <div className="text-xs text-textMuted font-medium uppercase tracking-wide">Payout Success</div>
+                <div className="text-xs text-textMuted uppercase tracking-wide">Payout Success</div>
                 <div className="text-lg font-bold text-emerald-400 mono-num mt-1">
-                  {kpis ? `${kpis.payout_success.success_rate_pct}%` : "100%"}
+                  {kpis ? `${kpis.payout_success.success_rate_pct}%` : '100%'}
                 </div>
-                <div className="text-xs text-textMuted mt-1">{kpis ? kpis.payout_success.failed_events : 0} shortfalls</div>
+                <div className="text-xs text-textMuted mt-1">
+                  {kpis ? kpis.payout_success.failed_events : 0} shortfalls
+                </div>
               </div>
+
             </div>
 
-            {/* TAB: DASHBOARD */}
+            {/* Dashboard */}
             {tab === 'dashboard' && (
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <div className="lg:col-span-2 bg-panelDark border border-borderDark rounded-xl p-5 flex flex-col">
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="font-bold text-base text-textLight">Real-Time Liquidity Stack & Safety Bounds</h3>
-                    <span className="text-xs text-textMuted">Live Ledger Balance vs R_total</span>
+
+                <div className="lg:col-span-2 bg-panelDark border border-borderDark rounded-xl p-5">
+                  <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
+                    <h3 className="font-bold text-base">
+                      Real-Time Liquidity Stack & Safety Bounds
+                    </h3>
+                    <span className="text-xs text-textMuted">
+                      Ledger Balance vs Reserve Target
+                    </span>
                   </div>
                   <div ref={chartRef} className="h-80 w-full"></div>
+                  {chartHistory.length === 0 && (
+                    <p className="text-sm text-textMuted">Loading chart data...</p>
+                  )}
                 </div>
 
-                {/* Live Decision Feed */}
-                <div className="bg-panelDark border border-borderDark rounded-xl p-5 flex flex-col">
+                <div className="bg-panelDark border border-borderDark rounded-xl p-5">
                   <div className="flex items-center justify-between mb-3 border-b border-borderDark pb-2">
-                    <h3 className="font-bold text-base text-textLight">Live Decision Feed</h3>
-                    <span className="text-xs bg-bgDark px-2 py-0.5 rounded text-accentBlue border border-borderDark font-mono">
+                    <h3 className="font-bold">Live Decision Feed</h3>
+                    <span className="text-xs text-accentBlue">
                       {decisions.length} recorded
                     </span>
                   </div>
+
                   <div className="space-y-2.5 overflow-y-auto max-h-80 pr-1 text-xs font-mono">
-                    {decisions.map((d) => (
-                      <div key={d.seq} className="p-2.5 rounded bg-bgDark border border-borderDark flex flex-col gap-1">
-                        <div className="flex justify-between items-center text-textMuted">
-                          <span className="font-bold text-accentBlue">STEP #{d.step_index}</span>
-                          <span>{d.record_hash}</span>
+                    {decisions.map(d => (
+                      <div key={d.seq} className="p-2.5 rounded bg-bgDark border border-borderDark">
+                        <div className="flex justify-between gap-2 text-textMuted">
+                          <span className="font-bold text-accentBlue">
+                            STEP #{d.step_index}
+                          </span>
+                          <span className="truncate">{d.record_hash}</span>
                         </div>
-                        <div className="font-semibold text-textLight">{d.action}</div>
-                        <div className="text-textMuted text-[11px]">{d.reason}</div>
+                        <div className="font-semibold mt-1">{d.action}</div>
+                        <div className="text-textMuted mt-1">{d.reason}</div>
                       </div>
                     ))}
+
                     {decisions.length === 0 && (
-                      <div className="text-center text-textMuted py-8">No decisions recorded yet.</div>
+                      <div className="text-center text-textMuted py-8">
+                        No decisions recorded yet.
+                      </div>
                     )}
                   </div>
                 </div>
+
               </div>
             )}
 
-            {/* TAB: FORECAST */}
+            {/* Forecast */}
             {tab === 'forecast' && (
               <div className="bg-panelDark border border-borderDark rounded-xl p-6 space-y-6">
-                <div className="flex justify-between items-center border-b border-borderDark pb-4">
-                  <div>
-                    <h2 className="text-lg font-bold text-textLight">Forecast Engine & Quantile Fan (M3 Model)</h2>
-                    <p className="text-xs text-textMuted">Hour x Day-of-Week profile with calendar multipliers & empirical ratio quantiles</p>
-                  </div>
-                  <span className="bg-blue-950 border border-blue-800 text-blue-300 text-xs px-2.5 py-1 rounded font-mono">
-                    Strict Anti-Leakage Guard Active
-                  </span>
+                <div className="border-b border-borderDark pb-4">
+                  <h2 className="text-lg font-bold">Forecast Engine & Quantile Fan</h2>
+                  <p className="text-xs text-textMuted">
+                    Deposit and withdrawal forecasts by horizon.
+                  </p>
                 </div>
 
                 {forecastData && (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+
                     <div className="space-y-4">
-                      <h4 className="font-bold text-sm text-tierRepo uppercase tracking-wide">Deposit Inflow Quantiles</h4>
+                      <h4 className="font-bold text-sm text-tierRepo uppercase">
+                        Deposit Inflow Quantiles
+                      </h4>
                       <div className="space-y-2 text-xs font-mono">
-                        {forecastData.deposits.map((d) => (
-                          <div key={d.horizon_h} className="p-3 bg-bgDark rounded border border-borderDark flex justify-between">
-                            <span className="text-accentBlue font-bold">Horizon +{d.horizon_h}h</span>
+                        {(forecastData.deposits || []).map(d => (
+                          <div key={d.horizon_h} className="p-3 bg-bgDark rounded border border-borderDark flex flex-wrap justify-between gap-2">
+                            <span className="text-accentBlue font-bold">+{d.horizon_h}h</span>
                             <span>P50: {formatUSD(d.p50_cents)}</span>
                             <span>P95: {formatUSD(d.p95_cents)}</span>
                             <span className="text-emerald-400">P99: {formatUSD(d.p99_cents)}</span>
@@ -531,11 +673,13 @@
                     </div>
 
                     <div className="space-y-4">
-                      <h4 className="font-bold text-tierOverdraft uppercase tracking-wide">Withdrawal Outflow Quantiles</h4>
+                      <h4 className="font-bold text-sm text-tierOverdraft uppercase">
+                        Withdrawal Outflow Quantiles
+                      </h4>
                       <div className="space-y-2 text-xs font-mono">
-                        {forecastData.withdrawals.map((w) => (
-                          <div key={w.horizon_h} className="p-3 bg-bgDark rounded border border-borderDark flex justify-between">
-                            <span className="text-amber-400 font-bold">Horizon +{w.horizon_h}h</span>
+                        {(forecastData.withdrawals || []).map(w => (
+                          <div key={w.horizon_h} className="p-3 bg-bgDark rounded border border-borderDark flex flex-wrap justify-between gap-2">
+                            <span className="text-amber-400 font-bold">+{w.horizon_h}h</span>
                             <span>P50: {formatUSD(w.p50_cents)}</span>
                             <span>P95: {formatUSD(w.p95_cents)}</span>
                             <span className="text-red-400">P99: {formatUSD(w.p99_cents)}</span>
@@ -543,121 +687,130 @@
                         ))}
                       </div>
                     </div>
+
+                  </div>
+                )}
+
+                {!forecastData && (
+                  <p className="text-textMuted text-sm">Forecast data is loading or unavailable.</p>
+                )}
+              </div>
+            )}
+
+            {/* Manual sweep */}
+            {tab === 'sweep' && (
+              <div className="max-w-2xl mx-auto bg-panelDark border border-borderDark rounded-xl p-6 space-y-6">
+                <div>
+                  <h2 className="text-lg font-bold">Manual Treasury Sweep Order</h2>
+                  <p className="text-xs text-textMuted">
+                    Preview safety checks before executing a sweep.
+                  </p>
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold text-textMuted uppercase">
+                    Sweep Amount (USD)
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={sweepAmount}
+                    onChange={e => setSweepAmount(e.target.value)}
+                    className="w-full bg-bgDark border border-borderDark rounded p-3 mt-1 text-base focus:border-accentBlue focus:outline-none"
+                  />
+                </div>
+
+                <div className="flex flex-wrap gap-3">
+                  <button
+                    onClick={handlePreviewSweep}
+                    className="flex-1 bg-panelDark hover:bg-borderDark border border-borderDark py-2.5 rounded font-semibold text-sm"
+                  >
+                    Preview Invariants
+                  </button>
+
+                  <button
+                    onClick={handleExecuteSweep}
+                    disabled={!sweepPreview || !sweepPreview.valid}
+                    className={`flex-1 py-2.5 rounded font-semibold text-sm ${
+                      sweepPreview && sweepPreview.valid
+                        ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                        : 'bg-borderDark text-textMuted cursor-not-allowed'
+                    }`}
+                  >
+                    Execute Sweep
+                  </button>
+                </div>
+
+                {sweepPreview && (
+                  <div className="p-4 bg-bgDark rounded-lg border border-borderDark space-y-2 text-xs font-mono">
+                    <div className="flex justify-between gap-2">
+                      <span className="text-textMuted">Sweep Status:</span>
+                      <span className={sweepPreview.valid ? 'text-emerald-400' : 'text-red-400'}>
+                        {sweepPreview.valid ? 'VALID' : 'REJECTED'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between gap-2">
+                      <span className="text-textMuted">Available Surplus:</span>
+                      <span>{formatUSD(sweepPreview.sweepable_surplus_cents)}</span>
+                    </div>
+                    <div className="flex justify-between gap-2">
+                      <span className="text-textMuted">Headroom After Sweep:</span>
+                      <span>{formatUSD(sweepPreview.headroom_after_cents)}</span>
+                    </div>
+                    {sweepPreview.reason_codes?.length > 0 && (
+                      <div className="text-red-400 pt-2 border-t border-borderDark">
+                        Rejection Reasons: {sweepPreview.reason_codes.join(', ')}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
             )}
 
-            {/* TAB: MANUAL SWEEP */}
-            {tab === 'sweep' && (
-              <div className="max-w-2xl mx-auto bg-panelDark border border-borderDark rounded-xl p-6 space-y-6">
-                <div>
-                  <h2 className="text-lg font-bold text-textLight">Manual Treasury Sweep Order</h2>
-                  <p className="text-xs text-textMuted">Propose an immediate sweep into Tier 1 Repo subject to invariant safety checks</p>
-                </div>
-
-                <div className="space-y-4">
+            {/* Backtest */}
+            {tab === 'backtest' && (
+              <div className="bg-panelDark border border-borderDark rounded-xl p-6 space-y-6">
+                <div className="flex flex-wrap justify-between items-center gap-3 border-b border-borderDark pb-4">
                   <div>
-                    <label className="text-xs font-semibold text-textMuted uppercase">Sweep Amount (USD)</label>
-                    <input
-                      type="number"
-                      value={sweepAmount}
-                      onChange={(e) => setSweepAmount(e.target.value)}
-                      className="w-full bg-bgDark border border-borderDark rounded p-3 text-textLight font-mono mt-1 text-base focus:border-accentBlue focus:outline-none"
-                    />
+                    <h2 className="text-lg font-bold">Walk-Forward Strategy Comparison</h2>
+                    <p className="text-xs text-textMuted">
+                      168-hour replay comparing treasury strategies.
+                    </p>
                   </div>
 
-                  <div className="flex gap-3">
-                    <button
-                      onClick={handlePreviewSweep}
-                      className="flex-1 bg-panelDark hover:bg-borderDark border border-borderDark py-2.5 rounded font-semibold text-sm text-textLight transition"
-                    >
-                      🔍 Preview Invariants
-                    </button>
-                    <button
-                      onClick={handleExecuteSweep}
-                      disabled={!sweepPreview || !sweepPreview.valid}
-                      className={`flex-1 py-2.5 rounded font-semibold text-sm transition ${
-                        sweepPreview && sweepPreview.valid
-                          ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
-                          : 'bg-borderDark text-textMuted cursor-not-allowed'
-                      }`}
-                    >
-                      ⚡ Execute Sweep
-                    </button>
-                  </div>
-
-                  {sweepPreview && (
-                    <div className="p-4 bg-bgDark rounded-lg border border-borderDark space-y-2 text-xs font-mono">
-                      <div className="flex justify-between">
-                        <span className="text-textMuted">Sweep Status:</span>
-                        <span className={sweepPreview.valid ? "text-emerald-400 font-bold" : "text-red-400 font-bold"}>
-                          {sweepPreview.valid ? "VALID — ALL INVARIANTS PASS" : "REJECTED"}
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-textMuted">Available Surplus:</span>
-                        <span>{formatUSD(sweepPreview.sweepable_surplus_cents)}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-textMuted">Headroom After Sweep:</span>
-                        <span>{formatUSD(sweepPreview.headroom_after_cents)}</span>
-                      </div>
-                      {sweepPreview.reason_codes.length > 0 && (
-                        <div className="text-red-400 pt-2 border-t border-borderDark">
-                          Rejection Reasons: {sweepPreview.reason_codes.join(", ")}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* TAB: BACKTESTING (B0-B4) */}
-            {tab === 'backtest' && (              <div className="bg-panelDark border border-borderDark rounded-xl p-6 space-y-6">
-                <div className="flex justify-between items-center border-b border-borderDark pb-4">
-                  <div>
-                    <h2 className="text-lg font-bold text-textLight">Walk-Forward Strategy Comparison (B0–B4)</h2>
-                    <p className="text-xs text-textMuted">168-hour common horizon walk-forward replay with identical opening capital ($3.0B)</p>
-                  </div>
                   <button
                     onClick={handleRunBacktest}
                     disabled={backtestLoading}
-                    className="bg-accentBlue hover:bg-blue-600 text-bgDark px-4 py-2 rounded font-bold text-sm transition"
+                    className="bg-accentBlue hover:bg-blue-600 text-bgDark px-4 py-2 rounded font-bold text-sm disabled:opacity-50"
                   >
-                    {backtestLoading ? "Running Replay..." : "▶ Run Backtest Replay"}
+                    {backtestLoading ? 'Running Replay...' : 'Run Backtest Replay'}
                   </button>
                 </div>
 
                 {backtestResults && (
                   <div className="overflow-x-auto">
                     <table className="w-full text-left text-xs font-mono">
-                      <thead className="bg-bgDark text-textMuted border-b border-borderDark uppercase">
+                      <thead className="bg-bgDark text-textMuted border-b border-borderDark">
                         <tr>
                           <th className="p-3">Strategy</th>
                           <th className="p-3">Status</th>
                           <th className="p-3">Payout Success</th>
                           <th className="p-3">Gross Yield</th>
-                          <th className="p-3">Net Realized Yield</th>
+                          <th className="p-3">Net Yield</th>
                           <th className="p-3">Peak Overdraft</th>
                           <th className="p-3">Avg Cash Buffer</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-borderDark">
-                        {backtestResults.map((r) => (
-                          <tr key={r.strategy_id} className="hover:bg-bgDark/50">
+                        {backtestResults.map(r => (
+                          <tr key={r.strategy_id}>
                             <td className="p-3 font-bold text-accentBlue">{r.strategy_id}</td>
-                            <td className="p-3">
-                              <span className="bg-emerald-950 text-emerald-300 border border-emerald-800 px-2 py-0.5 rounded text-[11px]">
-                                {r.status}
-                              </span>
-                            </td>
-                            <td className="p-3 text-emerald-400">{r.payout_success_steps_pct}%</td>
+                            <td className="p-3">{r.status}</td>
+                            <td className="p-3">{r.payout_success_steps_pct}%</td>
                             <td className="p-3">{formatUSD(r.gross_yield_usd * 100)}</td>
-                            <td className="p-3 font-bold text-amber-400">{formatUSD(r.net_yield_usd * 100)}</td>
+                            <td className="p-3 text-amber-400">{formatUSD(r.net_yield_usd * 100)}</td>
                             <td className="p-3">{formatUSD(r.overdraft_peak_usd * 100)}</td>
-                            <td className="p-3 text-textMuted">{formatUSD(r.avg_cash_usd * 100)}</td>
+                            <td className="p-3">{formatUSD(r.avg_cash_usd * 100)}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -667,92 +820,113 @@
               </div>
             )}
 
-            {/* TAB: STRESS TESTING */}
+            {/* Stress testing */}
             {tab === 'stress' && (
               <div className="bg-panelDark border border-borderDark rounded-xl p-6 space-y-6">
                 <div>
-                  <h2 className="text-lg font-bold text-textLight">Stress Testing Scenario Injector</h2>
-                  <p className="text-xs text-textMuted">Inject any of the 10 PRD §11.2 stress scenarios and measure real financial resilience</p>
+                  <h2 className="text-lg font-bold">Stress Testing Scenario Injector</h2>
+                  <p className="text-xs text-textMuted">
+                    Test the treasury against adverse scenarios.
+                  </p>
                 </div>
 
-                <div className="flex gap-4 items-end max-w-xl">
-                  <div className="flex-1">
-                    <label className="text-xs text-textMuted font-bold uppercase">Select Scenario</label>
+                <div className="flex flex-wrap gap-4 items-end max-w-xl">
+                  <div className="flex-1 min-w-56">
+                    <label className="text-xs text-textMuted font-bold uppercase">
+                      Select Scenario
+                    </label>
                     <select
                       value={selectedScenario}
-                      onChange={(e) => setSelectedScenario(e.target.value)}
-                      className="w-full bg-bgDark border border-borderDark rounded p-2.5 text-sm text-textLight mt-1"
+                      onChange={e => setSelectedScenario(e.target.value)}
+                      className="w-full bg-bgDark border border-borderDark rounded p-2.5 text-sm mt-1"
                     >
-                      <option value="OUTFLOW_MULT">3x Outflow Multiplier (6h)</option>
+                      <option value="OUTFLOW_MULT">3x Outflow Multiplier</option>
                       <option value="WITHDRAWAL_SPIKE">$150M Outflow Spike</option>
-                      <option value="DELAYED_DEPOSITS">Delayed Deposits (6h)</option>
-                      <option value="REPO_UNAVAILABLE">Repo Window Lockout (48h)</option>
-                      <option value="LIQUIDATION_DELAY">+48h Settlement Lag</option>
-                      <option value="BOND_SHOCK">+150bp Bond Yield Shock</option>
-                      <option value="EQUITY_CRASH">-25% Equity Crash</option>
+                      <option value="DELAYED_DEPOSITS">Delayed Deposits</option>
+                      <option value="REPO_UNAVAILABLE">Repo Window Lockout</option>
+                      <option value="LIQUIDATION_DELAY">Settlement Lag</option>
+                      <option value="BOND_SHOCK">Bond Yield Shock</option>
+                      <option value="EQUITY_CRASH">Equity Crash</option>
                       <option value="CORRELATED_RUN">Correlated Outflows + Market Shock</option>
-                      <option value="OVERDRAFT_RESTRICTED">Overdraft Capped at 0.25x</option>
-                      <option value="COMBINED_WORST">Combined Worst-Case Drill</option>
+                      <option value="OVERDRAFT_RESTRICTED">Restricted Overdraft</option>
+                      <option value="COMBINED_WORST">Combined Worst Case</option>
                     </select>
                   </div>
+
                   <button
                     onClick={handleRunStress}
-                    className="bg-tierOverdraft hover:bg-red-600 text-white px-5 py-2.5 rounded font-bold text-sm transition"
+                    className="bg-tierOverdraft hover:bg-red-600 text-white px-5 py-2.5 rounded font-bold text-sm"
                   >
-                    ⚡ Inject Stress
+                    Inject Stress
                   </button>
                 </div>
 
                 {stressReport && (
-                  <div className="p-4 bg-bgDark rounded-xl border border-borderDark space-y-3 font-mono text-xs max-w-2xl">
-                    <div className="text-sm font-bold text-accentBlue">STRESS REPORT: {stressReport.scenario_id}</div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>Min Stressed Cash: <span className="font-bold">{formatUSD(stressReport.min_cash_stressed_cents)}</span></div>
-                      <div>Peak Overdraft: <span className="font-bold">{formatUSD(stressReport.overdraft_peak_stressed_cents)}</span></div>
-                      <div>Net P&L Impact: <span className="font-bold text-red-400">{formatUSD(stressReport.net_pnl_delta_cents)}</span></div>
-                      <div>Payout Shortfalls: <span className="font-bold text-emerald-400">{stressReport.payout_failures_stressed}</span></div>
+                  <div className="p-4 bg-bgDark rounded-xl border border-borderDark space-y-3 font-mono text-xs">
+                    <div className="text-sm font-bold text-accentBlue">
+                      STRESS REPORT: {stressReport.scenario_id}
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>Min Stressed Cash: {formatUSD(stressReport.min_cash_stressed_cents)}</div>
+                      <div>Peak Overdraft: {formatUSD(stressReport.overdraft_peak_stressed_cents)}</div>
+                      <div>Net P&L Impact: {formatUSD(stressReport.net_pnl_delta_cents)}</div>
+                      <div>Payout Shortfalls: {stressReport.payout_failures_stressed}</div>
                     </div>
                   </div>
                 )}
               </div>
             )}
 
-            {/* TAB: AUDIT & LEDGER */}
+            {/* Audit */}
             {tab === 'audit' && (
               <div className="bg-panelDark border border-borderDark rounded-xl p-6 space-y-6">
-                <div className="flex justify-between items-center border-b border-borderDark pb-4">
+                <div className="flex flex-wrap justify-between items-center gap-3 border-b border-borderDark pb-4">
                   <div>
-                    <h2 className="text-lg font-bold text-textLight">Tamper-Evident SHA-256 Audit Trail</h2>
-                    <p className="text-xs text-textMuted">Cryptographic hash chain proving ledger transactions have not been altered or reordered</p>
+                    <h2 className="text-lg font-bold">Tamper-Evident SHA-256 Audit Trail</h2>
+                    <p className="text-xs text-textMuted">
+                      Verify the integrity of the audit chain.
+                    </p>
                   </div>
+
                   <button
                     onClick={handleVerifyAudit}
-                    className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded font-bold text-sm transition"
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded font-bold text-sm"
                   >
-                    ✔ Verify Hash Chain
+                    Verify Hash Chain
                   </button>
                 </div>
 
                 {auditStatus && (
                   <div className={`p-4 rounded-lg border font-mono text-xs ${
-                    auditStatus.valid ? "bg-emerald-950/50 border-emerald-800 text-emerald-300" : "bg-red-950/50 border-red-800 text-red-300"
+                    auditStatus.valid
+                      ? 'bg-emerald-950/50 border-emerald-800 text-emerald-300'
+                      : 'bg-red-950/50 border-red-800 text-red-300'
                   }`}>
                     <div className="font-bold text-sm">
-                      {auditStatus.valid ? "✔ AUDIT CHAIN VERIFIED: 100% UNBROKEN INTEGRITY" : "✖ AUDIT CHAIN COMPROMISED"}
+                      {auditStatus.valid
+                        ? 'AUDIT CHAIN VERIFIED'
+                        : 'AUDIT CHAIN COMPROMISED'}
                     </div>
-                    <div>Checked Records: {auditStatus.checked_records} consecutive decisions and transactions.</div>
+                    <div>
+                      Checked Records: {auditStatus.checked_records}
+                    </div>
                   </div>
                 )}
 
                 <div className="space-y-2">
-                  <h4 className="text-xs uppercase text-textMuted font-bold">Recent Cryptographic Records</h4>
+                  <h4 className="text-xs uppercase text-textMuted font-bold">
+                    Recent Cryptographic Records
+                  </h4>
+
                   <div className="space-y-2 font-mono text-xs">
-                    {decisions.slice(0, 8).map((d) => (
-                      <div key={d.seq} className="p-3 bg-bgDark rounded border border-borderDark flex justify-between items-center">
+                    {decisions.slice(0, 8).map(d => (
+                      <div key={d.seq} className="p-3 bg-bgDark rounded border border-borderDark flex flex-wrap justify-between gap-2">
                         <div>
-                          <span className="font-bold text-accentBlue">Seq #{d.seq}</span> · <span className="text-textLight">{d.action}</span>
+                          <span className="font-bold text-accentBlue">Seq #{d.seq}</span>
+                          {' · '}
+                          <span>{d.action}</span>
                         </div>
-                        <div className="text-textMuted text-[11px]">
+                        <div className="text-textMuted">
                           Prev: {d.prev_hash} → Hash: {d.record_hash}
                         </div>
                       </div>
@@ -761,13 +935,16 @@
                 </div>
               </div>
             )}
+
           </main>
 
-          {/* Footer */}
-          <footer className="border-t border-borderDark bg-panelDark px-6 py-3 text-xs text-textMuted flex justify-between items-center">
-            <span className="font-mono">Reserve Juggler v1.3 · Mode: SIMULATION — no real funds moved</span>
-            <span>Single Source of Truth: Double-Entry Ledger (Integer Cents)</span>
+          <footer className="border-t border-borderDark bg-panelDark px-6 py-3 text-xs text-textMuted flex flex-wrap justify-between gap-2">
+            <span className="font-mono">
+              Reserve Juggler v1.3 · SIMULATION — no real funds moved
+            </span>
+            <span>Double-Entry Ledger · Integer Cents</span>
           </footer>
+
         </div>
       );
     }
