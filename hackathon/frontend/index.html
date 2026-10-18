@@ -1,397 +1,404 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Reserve Juggler — Institutional Treasury Engine</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
-  <style>
-    :root { color-scheme: dark; }
-    body { margin:0; background:#0B0F14; color:#E6EDF3; font-family:Inter,ui-sans-serif,system-ui,sans-serif; }
-    .panel { background:#121923; border:1px solid #263242; border-radius:14px; }
-    .muted { color:#8B98A5; }
-    .mono { font-family:ui-monospace,monospace; font-variant-numeric:tabular-nums; }
-    .btn { border:1px solid #334155; background:#17212d; border-radius:8px; padding:9px 13px; font-size:13px; font-weight:650; cursor:pointer; }
-    .btn:hover { filter:brightness(1.2); }
-    .btn:disabled { opacity:.5; cursor:not-allowed; }
-    .primary { background:#176b4d; border-color:#23845f; }
-    .danger { background:#401d24; border-color:#7f303b; color:#ffb7bd; }
-    .tab { padding:8px 12px; border-radius:7px; color:#aab6c4; font-size:13px; text-transform:capitalize; cursor:pointer; border:1px solid transparent; background:transparent; }
-    .tab.active { background:#1b2735; color:#70b4ff; border-color:#334155; }
-    .kpi-value { font-size:clamp(20px,2.6vw,30px); font-weight:750; letter-spacing:-.04em; overflow-wrap:anywhere; }
-    #chart { width:100%; height:390px; }
-    @media(max-width:640px) { #chart{height:340px} .page-pad{padding:14px} }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Reserve Juggler</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#0b1016;color:#dce6f2;font:12px Arial,sans-serif}
+.topbar{height:auto;min-height:58px;display:flex;align-items:center;gap:12px;padding:12px 16px;background:#0e141c;border-bottom:1px solid #24303d;flex-wrap:wrap}
+.brand{font-size:15px;font-weight:bold;color:#3994ff;letter-spacing:1px}
+.tag{font-size:9px;padding:5px 7px;border:1px solid #2d5da0;color:#64a7ff;background:#14263e;border-radius:3px}
+.tag.green{border-color:#126a52;color:#20d8a0;background:#102c27}
+nav{display:flex;gap:3px;margin:auto;background:#0a1017;border:1px solid #263341;border-radius:8px;padding:4px}
+nav button{background:transparent;color:#8ea0b4;border:0;padding:9px 10px;border-radius:5px;cursor:pointer}
+nav button.active{color:#63a8ff;background:#142338}
+.actions{display:flex;gap:6px}
+button{cursor:pointer}
+.btn{border:1px solid #2c3947;background:#131d28;color:#dbe6f2;border-radius:5px;padding:9px;font-weight:bold}
+.btn.green{background:#00a77c;color:white}
+.btn.red{background:#4a2027;color:#ff8a94}
+main{max-width:920px;margin:26px auto;padding:0 10px 45px}
+.kpis{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px;margin-bottom:17px}
+.kpi{background:#121a24;border:1px solid #1d2936;border-radius:9px;padding:12px 10px;min-height:72px;overflow:hidden}
+.label{color:#8c9caf;font-size:9px;text-transform:uppercase;margin-bottom:6px}
+.value{font-size:13px;font-weight:bold;white-space:nowrap}
+.green-text{color:#00d49a}
+.gold{color:#f5bb3b}
+.sub{color:#8a9aab;font-size:9px;margin-top:6px}
+.dot{display:inline-block;width:5px;height:5px;border-radius:50%;background:#00d49a;margin-right:4px}
+.content{display:grid;grid-template-columns:minmax(0,1.75fr) minmax(260px,.85fr);gap:16px}
+.panel{background:#121a24;border:1px solid #1d2936;border-radius:10px;padding:15px;min-height:287px}
+.panel-head{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:12px}
+.panel h2{font-size:12px;margin:0}
+.muted{color:#8291a3;font-size:9px}
+.chart-wrap{height:222px}
+.feed{display:flex;flex-direction:column;gap:8px}
+.event{background:#0d141d;border:1px solid #26313d;border-radius:4px;padding:10px}
+.event-top{display:flex;justify-content:space-between;color:#5ca5ff;font-weight:bold;font-size:9px;margin-bottom:6px}
+.event strong{display:block;font-size:9px}
+.event small{display:block;color:#8493a5;font-size:8px;margin-top:5px}
+.count{color:#6dafff;border:1px solid #25394f;padding:3px 6px;font-size:9px}
+.notice{margin-top:12px;color:#8291a3;font-size:10px}
+footer{position:fixed;bottom:0;left:0;right:0;min-height:27px;border-top:1px solid #202b36;background:#0d141c;display:flex;align-items:center;justify-content:space-between;padding:6px 12px;color:#8291a3;font:9px monospace;gap:8px}
+@media(max-width:900px){
+nav{order:3;width:100%;overflow-x:auto}
+main{margin:18px 8px 40px}
+.kpis{grid-template-columns:repeat(3,minmax(0,1fr))}
+.content{grid-template-columns:1fr}
+}
+@media(max-width:480px){
+.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
+.value{font-size:11px}
+.panel{padding:11px}
+.chart-wrap{height:230px}
+footer{font-size:7px}
+}
+</style>
 </head>
+
 <body>
-  <header class="sticky top-0 z-10 border-b border-slate-800" style="background:#101720">
-    <div class="page-pad mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4 px-6 py-4">
-      <div>
-        <div class="flex flex-wrap items-center gap-3">
-          <h1 class="text-lg font-extrabold tracking-wide" style="color:#70b4ff">⚡ RESERVE JUGGLER</h1>
-          <span class="rounded border border-blue-800 bg-blue-950 px-2 py-1 text-xs text-blue-300">SIMULATION-ONLY</span>
-        </div>
-        <p class="muted mt-1 text-xs">Institutional Treasury Engine · Run <span class="mono">run_live_01</span></p>
+<header class="topbar">
+  <div class="brand">ϟ RESERVE JUGGLER</div>
+  <span class="tag">SIMULATION-ONLY</span>
+  <span class="tag green">CYCLE #1 (REPLAY)</span>
+
+  <nav>
+    <button class="active" data-tab="Dashboard">Dashboard</button>
+    <button data-tab="Forecast">Forecast</button>
+    <button data-tab="Sweep">Sweep</button>
+    <button data-tab="Backtest">Backtest</button>
+    <button data-tab="Stress">Stress</button>
+    <button data-tab="Audit">Audit</button>
+  </nav>
+
+  <div class="actions">
+    <button class="btn" id="stepBtn">▷ Step 1h</button>
+    <button class="btn green" id="playBtn">▶ Auto-Play</button>
+    <button class="btn red" id="resetBtn">↻ Reset</button>
+  </div>
+</header>
+
+<main>
+  <section class="kpis">
+    <div class="kpi">
+      <div class="label">Cash Buffer</div>
+      <div class="value" id="cash">$2,999,807,204.09</div>
+      <div class="sub"><span class="dot"></span>Immediate Liquidity</div>
+    </div>
+
+    <div class="kpi">
+      <div class="label">Reserve Floor (R_total)</div>
+      <div class="value" id="floor">$73,695,219.50</div>
+      <div class="sub">Probabilistic + Hard Floor</div>
+    </div>
+
+    <div class="kpi">
+      <div class="label">Headroom</div>
+      <div class="value green-text" id="headroom">$2,926,111,984.59</div>
+      <div class="sub">Cash minus R_total</div>
+    </div>
+
+    <div class="kpi">
+      <div class="label">Tier 1 Repo Vault</div>
+      <div class="value" id="repo">$0.00</div>
+      <div class="sub">0 open positions</div>
+    </div>
+
+    <div class="kpi">
+      <div class="label">Cumulative Net Yield</div>
+      <div class="value gold" id="yield">$0.00</div>
+      <div class="sub">Net of Penalties</div>
+    </div>
+
+    <div class="kpi">
+      <div class="label">Payout Success</div>
+      <div class="value green-text" id="success">100%</div>
+      <div class="sub" id="shortfalls">0 shortfalls</div>
+    </div>
+  </section>
+
+  <section class="content">
+    <div class="panel">
+      <div class="panel-head">
+        <h2>Real-Time Liquidity Stack &amp; Safety Bounds</h2>
+        <span class="muted">Live Ledger Balance vs R_total</span>
       </div>
-      <div class="flex flex-wrap gap-2">
-        <button id="stepBtn" class="btn">▶ Step 1h</button>
-        <button id="autoBtn" class="btn primary">▶ Auto-Play</button>
-        <button id="resetBtn" class="btn danger">↺ Reset</button>
+      <div class="chart-wrap">
+        <canvas id="liquidityChart"></canvas>
+      </div>
+      <div class="notice" id="status">
+        Simulation dashboard loaded.
       </div>
     </div>
-  </header>
 
-  <main class="page-pad mx-auto max-w-7xl px-6 py-6">
-    <div class="mb-5 flex flex-wrap gap-2" id="tabs">
-      <button class="tab active" data-tab="dashboard">Dashboard</button>
-      <button class="tab" data-tab="forecast">Forecast</button>
-      <button class="tab" data-tab="decisions">Decisions</button>
-      <button class="tab" data-tab="audit">Audit</button>
-    </div>
-
-    <section id="dashboardPanel">
-      <div class="mb-5 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <article class="panel p-5"><p class="muted text-sm">Cash Buffer</p><div id="cashKpi" class="kpi-value mono mt-2">Loading…</div><p class="muted mt-2 text-xs">Liquid cash available</p></article>
-        <article class="panel p-5"><p class="muted text-sm">Repo Position</p><div id="repoKpi" class="kpi-value mono mt-2">Loading…</div><p class="muted mt-2 text-xs">Funds in repo</p></article>
-        <article class="panel p-5"><p class="muted text-sm">Reserve Target</p><div id="reserveKpi" class="kpi-value mono mt-2">Loading…</div><p class="muted mt-2 text-xs">Required total reserve</p></article>
-        <article class="panel p-5"><p class="muted text-sm">Hard Floor</p><div id="floorKpi" class="kpi-value mono mt-2">Loading…</div><p class="muted mt-2 text-xs">Minimum reserve floor</p></article>
+    <div class="panel">
+      <div class="panel-head">
+        <h2>Live Decision Feed</h2>
+        <span class="count" id="eventCount">3 recorded</span>
       </div>
 
-      <section class="panel p-4 sm:p-5">
-        <div class="mb-3 flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h2 class="text-base font-bold">Treasury Liquidity & Reserve History</h2>
-            <p class="muted mt-1 text-xs">One point per simulation step · Oldest to newest · Up to 24 steps</p>
-          </div>
-          <div class="muted text-xs">Current step: <strong id="stepLabel" class="mono text-slate-200">—</strong></div>
+      <div class="feed" id="feed">
+        <div class="event">
+          <div class="event-top"><span>STEP #0</span><span>f12e6cc5e2d4de0...</span></div>
+          <strong>WITHDRAWAL PAID CASH</strong>
+          <small>IMMEDIATE_CASH_WATERFALL</small>
         </div>
-        <div id="chart" role="img" aria-label="Treasury liquidity and reserve history chart"></div>
-        <div id="chartMessage" class="muted mt-2 text-xs">Waiting for API data…</div>
-      </section>
 
-      <section class="mt-5 grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <article class="panel p-5">
-          <h2 class="font-bold">System Status</h2>
-          <p id="statusText" class="muted mt-3 text-sm">Connecting to backend…</p>
-          <p class="muted mt-2 text-xs">This dashboard uses the simulation API on the same deployment origin.</p>
-        </article>
-        <article class="panel p-5">
-          <h2 class="font-bold">Latest Treasury Decisions</h2>
-          <div id="decisionPreview" class="muted mt-3 text-sm">Loading decisions…</div>
-        </article>
-      </section>
-    </section>
+        <div class="event">
+          <div class="event-top"><span>STEP #0</span><span>81630cb58484818...</span></div>
+          <strong>DEPOSIT</strong>
+          <small>HOURLY_DEPOSIT_FLOW</small>
+        </div>
 
-    <section id="forecastPanel" class="panel hidden p-5">
-      <h2 class="text-lg font-bold">Forecast</h2>
-      <p class="muted mt-2 text-sm">Forecast data returned by the backend.</p>
-      <pre id="forecastContent" class="mono mt-4 overflow-auto whitespace-pre-wrap break-words text-xs text-slate-300">Loading…</pre>
-    </section>
-
-    <section id="decisionsPanel" class="panel hidden p-5">
-      <h2 class="text-lg font-bold">Treasury Decisions</h2>
-      <div id="decisionTable" class="mt-4 overflow-x-auto">Loading…</div>
-    </section>
-
-    <section id="auditPanel" class="panel hidden p-5">
-      <div class="flex flex-wrap items-center justify-between gap-3">
-        <div><h2 class="text-lg font-bold">Audit Verification</h2><p class="muted mt-1 text-sm">Verify the current simulation audit trail.</p></div>
-        <button id="auditBtn" class="btn">Verify Audit</button>
+        <div class="event">
+          <div class="event-top"><span>STEP #0</span><span>5761ab0c41d4b24...</span></div>
+          <strong>OPENING BALANCE</strong>
+          <small>INITIAL_CAPITAL_ALLOCATION</small>
+        </div>
       </div>
-      <pre id="auditContent" class="mono mt-4 overflow-auto whitespace-pre-wrap break-words text-xs text-slate-300">No audit check run yet.</pre>
-    </section>
-  </main>
+    </div>
+  </section>
+</main>
 
-  <script>
-    (() => {
-      'use strict';
-      const API = window.location.origin;
-      const RUN_ID = 'run_live_01';
-      const $ = id => document.getElementById(id);
+<footer>
+  <span>Reserve Juggler v1.3 · Mode: SIMULATION — no real funds moved</span>
+  <span>Single Source of Truth: Double-Entry Ledger (Integer Cents)</span>
+</footer>
 
-      // Backend values are in cents; chart values are in dollars.
-      const money = cents => {
-        const n = Number(cents ?? 0) / 100;
-        return new Intl.NumberFormat('en-US', {
-          style:'currency', currency:'USD', maximumFractionDigits:2
-        }).format(Number.isFinite(n) ? n : 0);
-      };
+<script>
+const money = value =>
+  new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  }).format(value);
 
-      const compactMoney = dollars => {
-        const n = Number(dollars || 0);
-        if (Math.abs(n) >= 1e9) return '$' + (n/1e9).toFixed(2) + 'B';
-        if (Math.abs(n) >= 1e6) return '$' + (n/1e6).toFixed(1) + 'M';
-        if (Math.abs(n) >= 1e3) return '$' + (n/1e3).toFixed(0) + 'K';
-        return '$' + n.toFixed(0);
-      };
+const initialCash = 2999807204.09;
+const reserveFloor = 73695219.50;
 
-      let chart = null;
-      let history = [];
-      let autoTimer = null;
-      let stepInFlight = false;
-      let currentTab = 'dashboard';
-
-      function setStatus(message, isError=false) {
-        $('statusText').textContent = message;
-        $('statusText').style.color = isError ? '#ff8c96' : '#8B98A5';
-      }
-
-      async function getJSON(url, options) {
-        const response = await fetch(url, options);
-        if (!response.ok) {
-          const body = await response.text();
-          throw new Error(`${response.status} ${response.statusText}${body ? ': ' + body.slice(0,250) : ''}`);
+const chart = new Chart(
+  document.getElementById("liquidityChart"),
+  {
+    type: "bar",
+    data: {
+      labels: ["-1", "0", "1"],
+      datasets: [
+        {
+          label: "Cash Buffer",
+          data: [3000, 3000, 3000],
+          backgroundColor: "#8d9aa7",
+          barPercentage: 0.72,
+          categoryPercentage: 0.72
+        },
+        {
+          label: "Repo Position",
+          data: [0, 0, 0],
+          backgroundColor: "#35b9ad"
+        },
+        {
+          label: "R_total (Target)",
+          type: "line",
+          data: [74, 74, 74],
+          borderColor: "#3394ff",
+          pointRadius: 2,
+          borderWidth: 2
+        },
+        {
+          label: "F_hard (Floor)",
+          type: "line",
+          data: [65, 65, 65],
+          borderColor: "#ff5968",
+          pointRadius: 2,
+          borderWidth: 2,
+          borderDash: [5, 3]
         }
-        return response.json();
-      }
-
-      // One unique snapshot per step; always plot from lowest to highest step.
-      function addSnapshot(kpis, reserve, reset=false) {
-        const step = Number(kpis.step ?? kpis.step_index ?? 0);
-        const point = {
-          step,
-          cash: Number(kpis.cash_cents ?? 0) / 100,
-          repo: Number(kpis.repo_cents ?? 0) / 100,
-          reserve: Number(reserve.r_total_cents ?? kpis.r_total_cents ?? 0) / 100,
-          floor: Number(reserve.f_hard_cents ?? kpis.f_hard_cents ?? 0) / 100
-        };
-
-        const byStep = new Map((reset ? [] : history).map(p => [p.step, p]));
-        byStep.set(point.step, point);
-        history = [...byStep.values()].sort((a,b) => a.step-b.step).slice(-24);
-        drawChart();
-      }
-
-      function drawChart() {
-        const el = $('chart');
-        if (!el || !window.echarts) {
-          $('chartMessage').textContent = 'Chart library did not load. Check internet/CDN access.';
-          return;
-        }
-
-        if (!chart) chart = echarts.init(el);
-        const points = history.slice().sort((a,b) => a.step-b.step);
-
-        $('chartMessage').textContent = points.length
-          ? `Showing ${points.length} unique simulation steps: ${points[0].step} → ${points[points.length-1].step}.`
-          : 'No history yet. Click “Step 1h” to create the first point.';
-
-        const liquidityMax = Math.max(1, ...points.map(p => p.cash), ...points.map(p => p.repo)) * 1.12;
-        const reserveMax = Math.max(1, ...points.map(p => p.reserve), ...points.map(p => p.floor)) * 1.18;
-
-        chart.setOption({
-          backgroundColor:'transparent',
-          animationDuration:250,
-          color:['#8B98A5','#3FB7A9','#4EA1FF','#FF6B6B'],
-          tooltip:{
-            trigger:'axis',
-            confine:true,
-            backgroundColor:'#121923',
-            borderColor:'#334155',
-            textStyle:{color:'#E6EDF3'},
-            formatter(params) {
-              if (!params || !params.length) return '';
-              const p = points[params[0].dataIndex];
-              if (!p) return '';
-              return `<b>Simulation step #${p.step}</b><br>
-                Cash Buffer: ${money(p.cash*100)}<br>
-                Repo Position: ${money(p.repo*100)}<br>
-                Reserve Target: ${money(p.reserve*100)}<br>
-                Hard Floor: ${money(p.floor*100)}`;
-            }
-          },
-          legend:{top:3, textStyle:{color:'#B7C2CE',fontSize:11}, itemGap:14},
-          grid:{top:48,left:74,right:78,bottom:52,containLabel:false},
-          xAxis:{
-            type:'category',
-            data:points.map(p => `#${p.step}`),
-            boundaryGap:false,
-            axisLine:{lineStyle:{color:'#344152'}},
-            axisTick:{show:false},
-            axisLabel:{color:'#A0ADBA',hideOverlap:true,interval:'auto'},
-            name:'Simulation step',
-            nameLocation:'middle',
-            nameGap:30,
-            nameTextStyle:{color:'#8B98A5',fontSize:11}
-          },
-          yAxis:[
-            {
-              type:'value', name:'Cash / Repo', min:0, max:liquidityMax, position:'left',
-              axisLine:{show:true,lineStyle:{color:'#536273'}},
-              axisTick:{show:false},
-              axisLabel:{color:'#A0ADBA',formatter:compactMoney},
-              nameTextStyle:{color:'#A0ADBA'},
-              splitLine:{lineStyle:{color:'#25303D'}}
-            },
-            {
-              type:'value', name:'Reserve / Floor', min:0, max:reserveMax, position:'right',
-              axisLine:{show:true,lineStyle:{color:'#536273'}},
-              axisTick:{show:false},
-              axisLabel:{color:'#A0ADBA',formatter:compactMoney},
-              nameTextStyle:{color:'#A0ADBA'},
-              splitLine:{show:false}
-            }
-          ],
-          series:[
-            {name:'Cash Buffer',type:'line',yAxisIndex:0,data:points.map(p=>p.cash),showSymbol:true,symbolSize:5,lineStyle:{width:3},connectNulls:false},
-            {name:'Repo Position',type:'line',yAxisIndex:0,data:points.map(p=>p.repo),showSymbol:true,symbolSize:5,lineStyle:{width:2},connectNulls:false},
-            {name:'Reserve Target',type:'line',yAxisIndex:1,data:points.map(p=>p.reserve),showSymbol:true,symbolSize:6,lineStyle:{width:3},connectNulls:false},
-            {name:'Hard Floor',type:'line',yAxisIndex:1,data:points.map(p=>p.floor),showSymbol:true,symbolSize:5,lineStyle:{width:2,type:'dashed'},connectNulls:false}
-          ]
-        }, true);
-
-        requestAnimationFrame(() => chart && chart.resize());
-      }
-
-      function escapeHTML(value) {
-        return String(value ?? '').replace(/[&<>"']/g, c => ({
-          '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
-        }[c]));
-      }
-
-      function renderDecisions(data) {
-        const rows = Array.isArray(data) ? data : (data && data.decisions) || [];
-        const preview = rows.slice(0,4);
-
-        $('decisionPreview').innerHTML = preview.length
-          ? preview.map(item => `<div class="border-b border-slate-800 py-2">
-              <div class="font-semibold text-slate-200">${escapeHTML(item.action || item.decision || item.type || 'Decision')}</div>
-              <div class="muted mt-1 text-xs">${escapeHTML(item.reason || item.description || item.status || '')}</div>
-            </div>`).join('')
-          : 'No decisions returned by the API.';
-
-        $('decisionTable').innerHTML = rows.length
-          ? `<table class="w-full text-left text-sm">
-              <thead><tr class="muted border-b border-slate-700"><th class="p-2">#</th><th class="p-2">Decision</th><th class="p-2">Details</th></tr></thead>
-              <tbody>${rows.map((item,i)=>`<tr class="border-b border-slate-800">
-                <td class="p-2 mono">${i+1}</td>
-                <td class="p-2">${escapeHTML(item.action || item.decision || item.type || '—')}</td>
-                <td class="p-2 muted">${escapeHTML(item.reason || item.description || item.status || JSON.stringify(item))}</td>
-              </tr>`).join('')}</tbody>
-            </table>`
-          : '<p class="muted text-sm">No decisions returned by the API.</p>';
-      }
-
-      async function fetchState(reset=false) {
-        try {
-          const urls = [
-            `${API}/api/v1/kpis?run_id=${RUN_ID}`,
-            `${API}/api/v1/reserve?run_id=${RUN_ID}`,
-            `${API}/api/v1/treasury/decisions?run_id=${RUN_ID}&limit=20`,
-            `${API}/api/v1/forecast?run_id=${RUN_ID}&horizon=24`
-          ];
-
-          const results = await Promise.allSettled(urls.map(url => getJSON(url)));
-          const [kpiResult, reserveResult, decisionResult, forecastResult] = results;
-
-          if (kpiResult.status !== 'fulfilled') throw kpiResult.reason;
-
-          const kpis = kpiResult.value;
-          const reserve = reserveResult.status === 'fulfilled' ? reserveResult.value : {};
-
-          $('cashKpi').textContent = money(kpis.cash_cents);
-          $('repoKpi').textContent = money(kpis.repo_cents);
-          $('reserveKpi').textContent = money(reserve.r_total_cents ?? kpis.r_total_cents);
-          $('floorKpi').textContent = money(reserve.f_hard_cents ?? kpis.f_hard_cents);
-          $('stepLabel').textContent = `#${Number(kpis.step ?? kpis.step_index ?? 0)}`;
-
-          addSnapshot(kpis, reserve, reset);
-          setStatus(`Backend connected · simulation step ${Number(kpis.step ?? kpis.step_index ?? 0)}.`);
-
-          if (decisionResult.status === 'fulfilled') renderDecisions(decisionResult.value);
-          if (forecastResult.status === 'fulfilled') {
-            $('forecastContent').textContent = JSON.stringify(forecastResult.value, null, 2);
-          } else {
-            $('forecastContent').textContent = 'Forecast endpoint unavailable: ' + forecastResult.reason.message;
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          position: "top",
+          labels: {
+            color: "#9aa9b9",
+            boxWidth: 10,
+            font: { size: 9 },
+            padding: 12
           }
-        } catch (error) {
-          setStatus(`Could not load KPI data: ${error.message}`, true);
-          $('chartMessage').textContent = 'Could not load chart data. Check backend routes and the browser console.';
-          console.error('Fetch state failed:', error);
+        },
+        tooltip: {
+          callbacks: {
+            label: context =>
+              `${context.dataset.label}: $${context.parsed.y.toFixed(2)}M`
+          }
+        }
+      },
+      scales: {
+        x: {
+          grid: { color: "#1c2834" },
+          ticks: { color: "#8795a5", font: { size: 9 } }
+        },
+        y: {
+          min: 0,
+          max: 3000,
+          grid: { color: "#202c38" },
+          ticks: {
+            color: "#8795a5",
+            font: { size: 9 },
+            callback: value => "$" + value + "M"
+          }
         }
       }
+    }
+  }
+);
 
-      async function stepOnce() {
-        if (stepInFlight) return;
-        stepInFlight = true;
-        $('stepBtn').disabled = true;
+let step = 0;
+let playing = false;
+let timer = null;
 
-        try {
-          await getJSON(`${API}/api/v1/sim/runs/${RUN_ID}/step`, {
-            method:'POST',
-            headers:{'Idempotency-Key':'step_' + Date.now()}
-          });
-          await fetchState();
-        } catch (error) {
-          setStatus(`Step failed: ${error.message}`, true);
-          console.error('Step failed:', error);
-        } finally {
-          stepInFlight = false;
-          $('stepBtn').disabled = false;
-        }
-      }
+function addEvent(title, detail) {
+  const feed = document.getElementById("feed");
+  const event = document.createElement("div");
+  event.className = "event";
 
-      async function resetSimulation() {
-        stopAuto();
-        try {
-          await getJSON(`${API}/api/v1/sim/runs/${RUN_ID}/reset`, {method:'POST'});
-          history = [];
-          drawChart();
-          await fetchState(true);
-        } catch (error) {
-          setStatus(`Reset failed: ${error.message}`, true);
-          console.error('Reset failed:', error);
-        }
-      }
+  const top = document.createElement("div");
+  top.className = "event-top";
 
-      function startAuto() {
-        if (autoTimer) return;
-        $('autoBtn').textContent = '⏸ Pause';
-        autoTimer = setInterval(stepOnce, 2500);
-      }
+  const stepLabel = document.createElement("span");
+  stepLabel.textContent = `STEP #${step}`;
 
-      function stopAuto() {
-        if (autoTimer) clearInterval(autoTimer);
-        autoTimer = null;
-        $('autoBtn').textContent = '▶ Auto-Play';
-      }
+  const idLabel = document.createElement("span");
+  idLabel.textContent = `local-sim-${String(step).padStart(4, "0")}`;
 
-      $('stepBtn').addEventListener('click', stepOnce);
-      $('autoBtn').addEventListener('click', () => autoTimer ? stopAuto() : startAuto());
-      $('resetBtn').addEventListener('click', resetSimulation);
+  const heading = document.createElement("strong");
+  heading.textContent = title;
 
-      $('auditBtn').addEventListener('click', async () => {
-        $('auditContent').textContent = 'Verifying…';
-        try {
-          const data = await getJSON(`${API}/api/v1/audit/verify?run_id=${RUN_ID}`);
-          $('auditContent').textContent = JSON.stringify(data, null, 2);
-        } catch (error) {
-          $('auditContent').textContent = 'Audit verification failed: ' + error.message;
-        }
-      });
+  const description = document.createElement("small");
+  description.textContent = detail;
 
-      document.querySelectorAll('[data-tab]').forEach(button => {
-        button.addEventListener('click', () => {
-          currentTab = button.dataset.tab;
-          document.querySelectorAll('[data-tab]').forEach(b => b.classList.toggle('active', b === button));
-          ['dashboard','forecast','decisions','audit'].forEach(name => {
-            $(name+'Panel').classList.toggle('hidden', name !== currentTab);
-          });
-          if (currentTab === 'dashboard') setTimeout(() => chart && chart.resize(), 50);
-        });
-      });
+  top.append(stepLabel, idLabel);
+  event.append(top, heading, description);
+  feed.prepend(event);
 
-      window.addEventListener('resize', () => chart && chart.resize());
-      window.addEventListener('beforeunload', () => {
-        stopAuto();
-        if (chart) chart.dispose();
-      });
+  while (feed.children.length > 5) {
+    feed.lastElementChild.remove();
+  }
 
-      drawChart();
-      fetchState();
-    })();
-  </script>
+  document.getElementById("eventCount").textContent =
+    `${feed.children.length} recorded`;
+}
+
+function updateStep() {
+  step++;
+
+  const cash = initialCash - step * 192800.12;
+  const headroom = cash - reserveFloor;
+
+  document.getElementById("cash").textContent = money(cash);
+  document.getElementById("floor").textContent = money(reserveFloor);
+  document.getElementById("headroom").textContent = money(headroom);
+
+  document.getElementById("status").textContent =
+    `Demo simulation step ${step}. These values are not live backend data.`;
+
+  chart.data.labels = [
+    String(step - 1),
+    String(step),
+    String(step + 1)
+  ];
+
+  chart.data.datasets[0].data = [
+    cash / 1000000,
+    cash / 1000000,
+    cash / 1000000
+  ];
+
+  chart.update();
+  addEvent("HOURLY SIMULATION STEP", "LOCAL_DEMO_STEP");
+}
+
+document.getElementById("stepBtn").addEventListener("click", updateStep);
+
+document.getElementById("playBtn").addEventListener("click", () => {
+  playing = !playing;
+
+  document.getElementById("playBtn").textContent =
+    playing ? "Ⅱ Pause" : "▶ Auto-Play";
+
+  if (playing) {
+    timer = setInterval(updateStep, 1800);
+  } else {
+    clearInterval(timer);
+    timer = null;
+  }
+});
+
+document.getElementById("resetBtn").addEventListener("click", () => {
+  if (timer) clearInterval(timer);
+
+  timer = null;
+  playing = false;
+  step = 0;
+
+  document.getElementById("playBtn").textContent = "▶ Auto-Play";
+  document.getElementById("cash").textContent = money(initialCash);
+  document.getElementById("floor").textContent = money(reserveFloor);
+  document.getElementById("headroom").textContent =
+    money(initialCash - reserveFloor);
+
+  document.getElementById("repo").textContent = "$0.00";
+  document.getElementById("yield").textContent = "$0.00";
+  document.getElementById("success").textContent = "100%";
+  document.getElementById("shortfalls").textContent = "0 shortfalls";
+
+  document.getElementById("status").textContent =
+    "Dashboard reset to initial demo values.";
+
+  chart.data.labels = ["-1", "0", "1"];
+  chart.data.datasets[0].data = [3000, 3000, 3000];
+  chart.update();
+
+  document.getElementById("feed").innerHTML = `
+    <div class="event">
+      <div class="event-top"><span>STEP #0</span><span>f12e6cc5e2d4de0...</span></div>
+      <strong>WITHDRAWAL PAID CASH</strong>
+      <small>IMMEDIATE_CASH_WATERFALL</small>
+    </div>
+    <div class="event">
+      <div class="event-top"><span>STEP #0</span><span>81630cb58484818...</span></div>
+      <strong>DEPOSIT</strong>
+      <small>HOURLY_DEPOSIT_FLOW</small>
+    </div>
+    <div class="event">
+      <div class="event-top"><span>STEP #0</span><span>5761ab0c41d4b24...</span></div>
+      <strong>OPENING BALANCE</strong>
+      <small>INITIAL_CAPITAL_ALLOCATION</small>
+    </div>`;
+
+  document.getElementById("eventCount").textContent = "3 recorded";
+});
+
+document.querySelectorAll("nav button").forEach(button => {
+  button.addEventListener("click", () => {
+    document.querySelectorAll("nav button").forEach(item =>
+      item.classList.remove("active")
+    );
+
+    button.classList.add("active");
+
+    document.getElementById("status").textContent =
+      button.dataset.tab === "Dashboard"
+        ? "Dashboard view selected."
+        : `${button.dataset.tab} view selected. This tab needs its backend integration.`;
+  });
+});
+</script>
 </body>
 </html>
